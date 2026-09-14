@@ -266,14 +266,16 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
         setProject({ ...project, [campo]: valor })
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('projects')
             .update({ [campo]: valor })
             .eq('id', projectId)
+            .select('id')
 
-        if (error) {
-            console.error(`Error actualizando ${campo}:`, error)
-            alert('No se pudo guardar el cambio')
+        // Cero filas sin error significa que RLS filtró el update.
+        if (error || !data || data.length === 0) {
+            console.error(`No se pudo actualizar ${campo}:`, error)
+            alert(error ? 'No se pudo guardar el cambio' : 'No tenés permiso para modificar este proyecto')
             setProject({ ...project, [campo]: anterior })
         }
     }
@@ -285,14 +287,15 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
 
         setProject({ ...project, progress: valor })
 
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('projects')
             .update({ progress: valor })
             .eq('id', projectId)
+            .select('id')
 
-        if (error) {
-            console.error('Error actualizando el avance:', error)
-            alert('No se pudo guardar el avance')
+        if (error || !data || data.length === 0) {
+            console.error('No se pudo actualizar el avance:', error)
+            alert(error ? 'No se pudo guardar el avance' : 'No tenés permiso para modificar este proyecto')
             setProject({ ...project, progress: anterior })
         }
     }

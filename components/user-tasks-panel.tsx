@@ -121,23 +121,29 @@ export function UserTasksPanel({ isOpen, onClose }: UserTasksPanelProps) {
         if (!activeTaskForCompletion) return
 
         try {
-            const { error } = await supabase
+            // El .select() detecta el caso en que RLS filtra la fila: PostgREST no
+            // devuelve error, devuelve cero filas, y sin este control la tarea se
+            // veía terminada en pantalla aunque nunca se hubiera guardado.
+            const { data, error } = await supabase
                 .from('tasks')
                 .update({
                     status: 'Terminada',
-                    notes: notes || activeTaskForCompletion.notes // Keep old notes if new ones empty? Or just update. Let's append or replace based on modal logic. Usually logic is in modal. here updates.
-                    // The modal returns 'notes'.
+                    notes: notes || activeTaskForCompletion.notes,
                 })
                 .eq('id', activeTaskForCompletion.id)
+                .select('id')
 
             if (error) throw error
+            if (!data || data.length === 0) {
+                throw new Error('No tenés permiso para cerrar esta tarea. Sólo pueden hacerlo sus responsables o un administrador.')
+            }
 
             // Refresh list
             fetchTasks()
             setActiveTaskForCompletion(null)
         } catch (error) {
             console.error('Error completing task:', error)
-            alert('Error al finalizar la tarea')
+            alert(error instanceof Error ? error.message : 'Error al finalizar la tarea')
         }
     }
 

@@ -94,11 +94,22 @@ export function TaskCard({
         const anterior = task.status
         setEstadoOptimista(nuevo)
 
-        const { error } = await supabase.from('tasks').update({ status: nuevo }).eq('id', task.id)
+        // El .select() no es decorativo: si RLS no deja tocar la fila, PostgREST
+        // no devuelve error, devuelve cero filas. Sin este control el cambio
+        // quedaba en pantalla y se perdía al recargar.
+        const { data, error } = await supabase
+            .from('tasks')
+            .update({ status: nuevo })
+            .eq('id', task.id)
+            .select('id')
 
-        if (error) {
-            console.error('Error actualizando el estado de la tarea:', error)
-            alert('No se pudo actualizar el estado de la tarea')
+        if (error || !data || data.length === 0) {
+            console.error('No se pudo actualizar el estado de la tarea:', error)
+            alert(
+                error
+                    ? 'No se pudo actualizar el estado de la tarea'
+                    : 'No tenés permiso para cambiar el estado de esta tarea. Sólo pueden hacerlo sus responsables o un administrador.'
+            )
             setEstadoOptimista(anterior)
             return
         }
