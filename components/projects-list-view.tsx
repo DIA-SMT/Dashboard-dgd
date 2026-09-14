@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
@@ -17,7 +17,7 @@ import { ProjectProgressChart } from '@/components/project-progress-chart'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { DailyNotesPanel } from '@/components/daily-notes-panel'
 import { TaskSummary, type TareaConProyecto } from '@/components/task-summary'
-import { countsTowardProgress } from '@/lib/task-status'
+import { countsTowardProgress, avanceEfectivo } from '@/lib/task-status'
 
 type ProjectProgress = {
     name: string
@@ -35,9 +35,15 @@ export function ProjectsListView() {
     const [searchQuery, setSearchQuery] = useState('')
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [sortBy, setSortBy] = useState<'priority' | 'deadline'>('deadline')
+    // R14: el cuarto eje de visualización que pide el expediente, además de
+    // estado (los indicadores), prioridad y fecha (el ordenamiento).
+    const [filtroResponsable, setFiltroResponsable] = useState('__TODOS__')
+    const [members, setMembers] = useState<{ id: string; full_name: string }[]>([])
     const [chartData, setChartData] = useState<ProjectProgress[]>([])
     const [activeCompletionProjectId, setActiveCompletionProjectId] = useState<string | null>(null)
-    const [projectProgress, setProjectProgress] = useState<Record<string, number>>({})
+    // Lo que sale de contar tareas. El avance que se MUESTRA es el efectivo,
+    // que puede estar pisado por un valor cargado a mano (R11).
+    const [avanceCalculado, setAvanceCalculado] = useState<Record<string, number>>({})
     const [allTasks, setAllTasks] = useState<TareaConProyecto[]>([])
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
     const [dailyNotesOpen, setDailyNotesOpen] = useState(false)
@@ -234,7 +240,7 @@ export function ProjectsListView() {
 
             setAllTasks((allTasks ?? []) as unknown as TareaConProyecto[])
             setChartData(Array.from(progressMap.values()).sort((a, b) => b.total - a.total))
-            setProjectProgress(progressState)
+            setAvanceCalculado(progressState)
         } catch (error) {
             console.error('Error fetching tasks and progress:', error)
             setLoadError('No se pudieron cargar los datos de progreso.')
@@ -296,11 +302,30 @@ export function ProjectsListView() {
         }
     }
 
+    useEffect(() => {
+        supabase.from('members').select('id, full_name').eq('habilita', 1).order('full_name')
+            .then(({ data }) => { if (data) setMembers(data) })
+    }, [])
+
+    const projectProgress = useMemo(() => {
+        const efectivo: Record<string, number> = { ...avanceCalculado }
+        for (const p of projects) {
+            efectivo[p.id] = avanceEfectivo(p.progress, avanceCalculado[p.id] ?? 0)
+        }
+        return efectivo
+    }, [projects, avanceCalculado])
+
     const filteredProjects = projects.filter(project => {
         const matchesSearch =
             project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
             (project.area && project.area.toLowerCase().includes(searchQuery.toLowerCase())) ||
             (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
+
+        const matchesResponsable =
+            filtroResponsable === '__TODOS__' ||
+            (filtroResponsable === '__SIN__' ? !project.owner_id : project.owner_id === filtroResponsable)
+
+        if (!matchesResponsable) return false
 
         let matchesFilter = false
 
@@ -435,6 +460,21 @@ export function ProjectsListView() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className="pl-10 bg-white"
                         />
+                    </div>
+
+                    <div className="w-full sm:w-56">
+                        <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
+                            <SelectTrigger className="bg-white">
+                                <SelectValue placeholder="Responsable" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="__TODOS__">Todos los responsables</SelectItem>
+                                <SelectItem value="__SIN__">Sin responsable</SelectItem>
+                                {members.map((m) => (
+                                    <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* Sort controls */}

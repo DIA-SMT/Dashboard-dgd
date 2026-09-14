@@ -327,6 +327,90 @@ export async function POST(req: Request) {
                 });
             },
         }),
+        get_task_comments: tool({
+            description:
+                'Obtener los comentarios de una tarea (autor, texto y fecha). Usar cuando pregunten qué se dijo o se observó sobre una tarea.',
+            inputSchema: jsonSchema({
+                type: 'object',
+                properties: { task_id: { type: 'string', format: 'uuid' } },
+                required: ['task_id'],
+                additionalProperties: false,
+            }),
+            execute: async ({ task_id }: any) => {
+                const { data, error } = await supabase
+                    .from('task_comments')
+                    .select('id, task_id, author_name, content, created_at')
+                    .eq('task_id', task_id)
+                    .eq('habilita', 1)
+                    .order('created_at', { ascending: true })
+
+                if (error) throw new Error(error.message)
+                return data
+            },
+        }),
+        get_activity_log: tool({
+            description:
+                'Historial de modificaciones de un proyecto o una tarea: qué campo cambió, de qué valor a cuál, quién y cuándo. Usar para preguntas del tipo "quién cambió el estado" o "qué pasó con este proyecto".',
+            inputSchema: jsonSchema({
+                type: 'object',
+                properties: {
+                    entity_id: { type: 'string', format: 'uuid', description: 'id del proyecto o de la tarea' },
+                    limit: { type: 'number', description: 'cantidad máxima de registros, por defecto 50' },
+                },
+                required: ['entity_id'],
+                additionalProperties: false,
+            }),
+            execute: async ({ entity_id, limit }: any) => {
+                const { data, error } = await supabase
+                    .from('activity_log')
+                    .select('entity_type, entity_id, action, field, old_value, new_value, changed_at, profiles(full_name)')
+                    .eq('entity_id', entity_id)
+                    .order('changed_at', { ascending: false })
+                    .limit(Math.min(Number(limit) || 50, 200))
+
+                if (error) throw new Error(error.message)
+                return (data ?? []).map((r: any) => ({ ...r, changed_by_name: r?.profiles?.full_name ?? null }))
+            },
+        }),
+        get_users: tool({
+            description:
+                'Listar los usuarios del sistema con su rol (admin o common) y si están habilitados. Distinto de get_members: members son las personas a las que se asignan tareas; usuarios son las cuentas que inician sesión.',
+            inputSchema: jsonSchema({
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            }),
+            execute: async () => {
+                const { data, error } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, role, habilita')
+                    .order('full_name', { ascending: true })
+
+                if (error) throw new Error(error.message)
+                return data
+            },
+        }),
+        get_daily_notes: tool({
+            description: 'Notas del día cargadas por el equipo (contenido, autor, si está hecha y fecha).',
+            inputSchema: jsonSchema({
+                type: 'object',
+                properties: {},
+                required: [],
+                additionalProperties: false,
+            }),
+            execute: async () => {
+                const { data, error } = await supabase
+                    .from('daily_notes')
+                    .select('content, done, created_by, member_name, created_at')
+                    .eq('habilita', 1)
+                    .order('created_at', { ascending: false })
+                    .limit(100)
+
+                if (error) throw new Error(error.message)
+                return data
+            },
+        }),
     } as const;
 
     let modelMessages
@@ -363,8 +447,20 @@ export async function POST(req: Request) {
                     return last.finishReason !== 'tool-calls'
                 },
                 system: `Eres un asistente del sistema de gestión de proyectos "Dashboard DGD".
-Tienes acceso a datos de la BD mediante herramientas (projects, tasks, members).
+Tienes acceso a datos de la BD mediante herramientas: proyectos, tareas,
+miembros, comentarios de tareas, historial de cambios, usuarios y notas del día.
 Antes de decir "no sé", consulta la BD con las herramientas.
+
+Sobre el modelo de datos:
+- Los estados de tarea son: "Sin empezar", "En desarrollo", "Pausada", "Terminada" y "Cancelada".
+  "Pausada" sigue siendo trabajo pendiente; "Cancelada" no se hará y no cuenta para el avance.
+- Las tareas pueden tener SUBTAREAS: si parent_task_id no es nulo, esa tarea es subtarea
+  de la que ese id indica. Al listar, agrupá las subtareas bajo su tarea madre en vez de
+  mezclarlas, y aclará cuáles son subtareas.
+- "Vencida" es una tarea con deadline anterior a hoy que no está Terminada ni Cancelada.
+- completed_at es cuándo se terminó la tarea; sirve para saber si se cerró dentro del plazo.
+- Los proyectos tienen owner_id (responsable), start_date, objectives, scope y progress
+  (avance cargado a mano; si es nulo, el avance sale de las tareas).
 Si el usuario pregunta por tareas de un miembro y no especifica el id, primero usa get_members para encontrarlo por nombre/email y luego usa get_tasks con member_id o assignee_name.
 Si el usuario pregunta por "mis tareas" o "mis tareas pendientes", usa get_my_tasks (y para pendientes usa status="Pendiente").
 Nota: "mis tareas" se resuelve por members.email == auth.email(). Si no existe, responde pidiendo que se cargue el email del miembro.

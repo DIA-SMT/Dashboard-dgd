@@ -13,10 +13,11 @@ import { TaskCard, type TaskWithAssignees } from '@/components/task-card'
 import { ActivityLogView } from '@/components/activity-log-view'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskCompletionModal } from '@/components/task-completion-modal'
-import { ArrowLeft, Calendar, CalendarPlus, CheckCircle2, History, ChevronDown, Pencil, Check, X, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, CalendarPlus, CheckCircle2, History, ChevronDown, Pencil, Check, X, Trash2, User as UserIcon } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { computeProgress, getStatusColor } from '@/lib/task-status'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { computeProgress, avanceEfectivo, getStatusColor } from '@/lib/task-status'
 
 /**
  * Bloque de texto largo con edición en línea.
@@ -109,6 +110,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [isEditingDeadline, setIsEditingDeadline] = useState(false)
     const [editedDeadline, setEditedDeadline] = useState('')
     const [verHistorial, setVerHistorial] = useState(false)
+    const [members, setMembers] = useState<{ id: string; full_name: string }[]>([])
+    const [editandoAvance, setEditandoAvance] = useState(false)
+    const [avanceEditado, setAvanceEditado] = useState('')
     const [isEditingStartDate, setIsEditingStartDate] = useState(false)
     const [editedStartDate, setEditedStartDate] = useState('')
 
@@ -166,6 +170,12 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         fetchProjectData()
     }, [fetchProjectData])
 
+    // R14: la nómina, para poder elegir el responsable del proyecto.
+    useEffect(() => {
+        supabase.from('members').select('id, full_name').eq('habilita', 1).order('full_name')
+            .then(({ data }) => { if (data) setMembers(data) })
+    }, [])
+
     // R5: la lista se arma por jerarquía. Una tarea sin parent_task_id es de
     // primer nivel; las demás cuelgan de ella. El avance sigue contando todas
     // por igual —madres y subtareas— porque cada una es trabajo real.
@@ -173,7 +183,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const subtareasDe = (id: string) => tasks.filter(t => t.parent_task_id === id)
 
     const completedTasks = tasks.filter(t => t.status === 'Terminada').length
-    const progress = computeProgress(tasks)
+    const avanceCalculado = computeProgress(tasks)
+    const progress = avanceEfectivo(project?.progress, avanceCalculado)
+    const avanceEsManual = project?.progress !== null && project?.progress !== undefined
 
 
     const updateProjectTitle = async () => {
@@ -248,7 +260,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
      * repetirlo por cada campo nuevo: objetivos, alcance y fecha de inicio
      * pasan todos por acá.
      */
-    const actualizarCampo = async (campo: 'objectives' | 'scope' | 'start_date', valor: string | null) => {
+    const actualizarCampo = async (campo: 'objectives' | 'scope' | 'start_date' | 'owner_id', valor: string | null) => {
         if (!project) return
         const anterior = project[campo]
 
@@ -263,6 +275,25 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             console.error(`Error actualizando ${campo}:`, error)
             alert('No se pudo guardar el cambio')
             setProject({ ...project, [campo]: anterior })
+        }
+    }
+
+    /** R11: avance cargado a mano. null devuelve el control al cálculo por tareas. */
+    const actualizarAvance = async (valor: number | null) => {
+        if (!project) return
+        const anterior = project.progress
+
+        setProject({ ...project, progress: valor })
+
+        const { error } = await supabase
+            .from('projects')
+            .update({ progress: valor })
+            .eq('id', projectId)
+
+        if (error) {
+            console.error('Error actualizando el avance:', error)
+            alert('No se pudo guardar el avance')
+            setProject({ ...project, progress: anterior })
         }
     }
 
@@ -446,6 +477,32 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                     placeholder="Qué incluye y qué queda afuera"
                                     onGuardar={(v) => actualizarCampo('scope', v)}
                                 />
+                                {/* R14: responsable del proyecto. */}
+                                <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+                                    <UserIcon className="h-4 w-4 shrink-0" />
+                                    <span>Responsable:</span>
+                                    {role === 'admin' && !project.completed_at ? (
+                                        <Select
+                                            value={project.owner_id || '__SIN__'}
+                                            onValueChange={(val) => actualizarCampo('owner_id', val === '__SIN__' ? null : val)}
+                                        >
+                                            <SelectTrigger className="h-8 w-[200px]">
+                                                <SelectValue placeholder="Sin asignar" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__SIN__">Sin asignar</SelectItem>
+                                                {members.map((m) => (
+                                                    <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <span className={project.owner_id ? 'font-medium text-slate-800' : 'italic text-slate-400'}>
+                                            {members.find(m => m.id === project.owner_id)?.full_name ?? 'sin asignar'}
+                                        </span>
+                                    )}
+                                </div>
+
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     {project.area && (
                                         <Badge variant="outline">{project.area}</Badge>
@@ -575,20 +632,82 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {/* Progress Bar */}
+                        {/* R11: el avance puede cargarse a mano; si no, sale de las tareas. */}
                         <div className="mb-2">
-                            <div className="flex justify-between text-sm text-slate-600 mb-2">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
                                 <span className="font-semibold">Progreso del proyecto</span>
-                                <span className="font-bold text-lg">{progress}%</span>
+
+                                {editandoAvance ? (
+                                    <div className="flex items-center gap-1">
+                                        <Input
+                                            type="number"
+                                            min={0}
+                                            max={100}
+                                            value={avanceEditado}
+                                            onChange={(e) => setAvanceEditado(e.target.value)}
+                                            className="h-8 w-20"
+                                            autoFocus
+                                        />
+                                        <span className="text-xs text-slate-400">%</span>
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-7 px-2"
+                                            onClick={async () => {
+                                                const n = Number(avanceEditado)
+                                                if (avanceEditado !== '' && (!Number.isFinite(n) || n < 0 || n > 100)) {
+                                                    alert('El avance tiene que ser un número entre 0 y 100')
+                                                    return
+                                                }
+                                                await actualizarAvance(avanceEditado === '' ? null : Math.round(n))
+                                                setEditandoAvance(false)
+                                            }}
+                                        >
+                                            <Check className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="h-7 px-2" onClick={() => setEditandoAvance(false)}>
+                                            <X className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <span className="flex items-center gap-2">
+                                        {avanceEsManual && (
+                                            <Badge variant="outline" className="text-[10px] font-normal text-slate-500">
+                                                cargado a mano
+                                            </Badge>
+                                        )}
+                                        <span className="text-lg font-bold">{progress}%</span>
+                                        {role === 'admin' && !project.completed_at && (
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                    setAvanceEditado(project.progress === null || project.progress === undefined ? '' : String(project.progress))
+                                                    setEditandoAvance(true)
+                                                }}
+                                                className="h-7 px-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                            >
+                                                <Pencil className="h-3.5 w-3.5" />
+                                            </Button>
+                                        )}
+                                    </span>
+                                )}
                             </div>
-                            <div className="w-full bg-slate-200 rounded-full h-3">
+
+                            <div className="h-3 w-full rounded-full bg-slate-200">
                                 <div
-                                    className="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full transition-all"
+                                    className="h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all"
                                     style={{ width: `${progress}%` }}
                                 />
                             </div>
-                            <div className="flex justify-between text-xs text-slate-500 mt-1">
+
+                            <div className="mt-1 flex flex-wrap justify-between gap-2 text-xs text-slate-500">
                                 <span>{completedTasks} de {tasks.length} tareas completadas</span>
+                                {avanceEsManual && (
+                                    <span className="text-slate-400">
+                                        Según las tareas sería {avanceCalculado}%. Dejá el campo vacío para volver al automático.
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </CardContent>

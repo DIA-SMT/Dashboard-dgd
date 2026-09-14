@@ -26,9 +26,11 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
         deadline: '',
         start_date: '',
         objectives: '',
-        scope: ''
+        scope: '',
+        owner_id: ''
     })
     const [existingAreas, setExistingAreas] = useState<string[]>([])
+    const [members, setMembers] = useState<{ id: string; full_name: string }[]>([])
     const [showSuggestions, setShowSuggestions] = useState(false)
     const { role } = useAuth()
 
@@ -37,8 +39,18 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
     useEffect(() => {
         if (open) {
             fetchExistingAreas()
+            fetchMembers()
         }
     }, [open])
+
+    async function fetchMembers() {
+        const { data } = await supabase
+            .from('members')
+            .select('id, full_name')
+            .eq('habilita', 1)
+            .order('full_name')
+        if (data) setMembers(data)
+    }
 
     async function fetchExistingAreas() {
         const { data } = await supabase
@@ -72,6 +84,7 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
                     ...formData,
                     deadline: formData.deadline || null,
                     start_date: formData.start_date || null,
+                    owner_id: formData.owner_id || null,
                     objectives: formData.objectives || null,
                     scope: formData.scope || null,
                     status: 'Pendiente'
@@ -82,7 +95,7 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
                 router.push(`/projects/${data.id}`)
                 onProjectCreated() // Update list in background or for back navigation
                 setOpen(false)
-                setFormData({ title: '', description: '', area: '', type: '', priority: 'Media', deadline: '', start_date: '', objectives: '', scope: '' })
+                setFormData({ title: '', description: '', area: '', type: '', priority: 'Media', deadline: '', start_date: '', objectives: '', scope: '', owner_id: '' })
             } else {
                 // Fallback if no data returned for some reason
                 setOpen(false)
@@ -210,6 +223,23 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
                                     <SelectItem value="Media">Media</SelectItem>
                                     <SelectItem value="Alta">Alta</SelectItem>
                                     <SelectItem value="Urgente">Urgente</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="owner_id">Responsable</Label>
+                            <Select
+                                value={formData.owner_id || '__SIN__'}
+                                onValueChange={(val) => setFormData({ ...formData, owner_id: val === '__SIN__' ? '' : val })}
+                            >
+                                <SelectTrigger id="owner_id">
+                                    <SelectValue placeholder="Sin asignar" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__SIN__">Sin asignar</SelectItem>
+                                    {members.map((m) => (
+                                        <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

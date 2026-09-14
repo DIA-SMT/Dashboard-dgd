@@ -57,6 +57,18 @@ export function computeProgress(tasks: { status: string | null }[]): number {
     return Math.round((hechas / computables.length) * 100)
 }
 
+/**
+ * Avance efectivo de un proyecto.
+ *
+ * R11 del expediente pide poder actualizar el porcentaje a mano. Cuando hay un
+ * valor cargado, ese manda; si no, vale el derivado de las tareas. Mostrar los
+ * dos números a la vez sería peor que mostrar uno solo: nadie sabría cuál es
+ * "el" avance del proyecto.
+ */
+export function avanceEfectivo(manual: number | null | undefined, calculado: number): number {
+    return manual ?? calculado
+}
+
 // ---------------------------------------------------------------------------
 // Vencimientos (R12)
 // ---------------------------------------------------------------------------
