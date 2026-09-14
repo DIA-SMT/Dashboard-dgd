@@ -49,12 +49,26 @@ create unique index if not exists members_user_id_key
 -- comportara distinto a lo esperado, el usuario no podría apagar su marca y
 -- quedaría encerrado en el redirect a /cambiar-password.
 --
--- El service role queda exento: es el que usa /api/admin/users, que ya verifica
--- que quien llama sea admin.
+-- Sólo se restringe a los usuarios finales. El acceso directo a la base (SQL
+-- Editor) y la API de admin quedan exentos: sin esa excepción, el trigger
+-- bloquearía el bootstrap del primer administrador, que se hace justamente
+-- desde el SQL Editor porque todavía no hay ningún admin que lo pueda hacer
+-- desde la aplicación.
 create or replace function public.proteger_rol_perfil()
 returns trigger as $$
 begin
-  if coalesce(auth.role(), '') = 'service_role' then
+  -- current_user es el rol de Postgres bajo el que corre la sentencia, y
+  -- alcanza para distinguir de dónde viene el cambio:
+  --
+  --   'authenticated' -> un usuario logueado pegándole a PostgREST  => se restringe
+  --   'service_role'  -> /api/admin/users, que ya verificó que sea admin => pasa
+  --   'postgres'      -> el SQL Editor o psql, acceso directo a la base  => pasa
+  --
+  -- La función NO es security definer, a propósito: con security definer,
+  -- current_user pasaría a ser el dueño de la función y siempre daría
+  -- 'postgres', con lo que el control no distinguiría nada y no protegería
+  -- nada. Acá no hace falta elevar privilegios: sólo compara y aborta.
+  if current_user <> 'authenticated' then
     return new;
   end if;
 
@@ -68,7 +82,7 @@ begin
 
   return new;
 end;
-$$ language plpgsql security definer;
+$$ language plpgsql;
 
 drop trigger if exists profiles_proteger_rol on public.profiles;
 create trigger profiles_proteger_rol
