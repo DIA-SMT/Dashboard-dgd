@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dashboard Dulci — configuración: gestión de usuarios y roles
+-- Dashboard DGD — configuración: gestión de usuarios y roles
 -- =============================================================================
 -- Correr DESPUÉS de db/01_base.sql y db/02_pedido.sql.
 -- Aditivo: agrega dos columnas y una política. No toca datos existentes.

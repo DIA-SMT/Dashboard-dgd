@@ -105,7 +105,7 @@ NO RESPONDA A ESTE CORREO ELECTRÓNICO
 
         // Enviar el email
         const info = await transporter.sendMail({
-            from: `"Dashboard Dulci" <${process.env.GMAIL_USER}>`,
+            from: `"Dashboard DGD" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: emailSubject,
             html: emailHtml,

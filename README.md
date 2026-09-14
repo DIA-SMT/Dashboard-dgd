@@ -27,7 +27,7 @@ Para enviar emails usando Gmail, necesitas crear una "App Password" (Contraseña
 2. **Crea una App Password**:
    - Ve a [App Passwords](https://myaccount.google.com/apppasswords)
    - Selecciona "Correo" como aplicación
-   - Selecciona "Otro (nombre personalizado)" como dispositivo y escribe "Dashboard Dulci"
+   - Selecciona "Otro (nombre personalizado)" como dispositivo y escribe "Dashboard DGD"
    - Haz clic en "Generar"
    - **Copia la contraseña de 16 caracteres** que Google te muestra (formato: xxxx xxxx xxxx xxxx)
 

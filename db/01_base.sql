@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dashboard Dulci — esquema base
+-- Dashboard DGD — esquema base
 -- =============================================================================
 -- Reconstruido a partir de types/supabase.ts, que refleja la base real en
 -- producción. Los .sql sueltos de la raíz del repo quedaron desactualizados:

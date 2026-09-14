@@ -1,5 +1,5 @@
 -- =============================================================================
--- Dashboard Dulci — lo que pide el expediente y todavía no existe
+-- Dashboard DGD — lo que pide el expediente y todavía no existe
 -- =============================================================================
 -- Correr DESPUÉS de db/01_base.sql.
 --
