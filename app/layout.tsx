@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { Navbar } from "@/components/navbar";
+import { AppShell } from "@/components/app-shell";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/context/ThemeContext";
 
@@ -34,8 +34,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <AuthProvider>
-            <Navbar />
-            {children}
+            <AppShell>{children}</AppShell>
             <ChatWidget />
           </AuthProvider>
         </ThemeProvider>

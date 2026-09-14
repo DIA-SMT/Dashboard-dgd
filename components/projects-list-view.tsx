@@ -1,118 +1,59 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Project } from '@/types'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { ProjectForm } from '@/components/project-form'
 import { Input } from '@/components/ui/input'
-import { ProjectSummary } from '@/components/project-summary'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Calendar, FolderKanban, Users, Search, ArrowLeft, CheckCircle2, LayoutGrid, List, Trash2, Flame, Clock3 } from 'lucide-react'
+import { ProjectForm } from '@/components/project-form'
+import { ProjectSummary, type Filtro } from '@/components/project-summary'
 import { ProjectProgressChart } from '@/components/project-progress-chart'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskSummary, type TareaConProyecto } from '@/components/task-summary'
+import { ProjectsTable } from '@/components/projects-table'
+import { PanelLateral } from '@/components/panel-lateral'
+import { Search, LayoutGrid, List, AlertCircle, Loader2, MoreVertical, Trash2, Upload, Eye } from 'lucide-react'
 import { countsTowardProgress, avanceEfectivo } from '@/lib/task-status'
+import { iniciales, tonoAvatar, fechaCorta, tiempoRelativo } from '@/lib/ui'
+
+const ESTADOS: { valor: Filtro; etiqueta: string }[] = [
+    { valor: 'active', etiqueta: 'Activos' },
+    { valor: 'pending', etiqueta: 'Pendientes' },
+    { valor: 'urgent', etiqueta: 'Urgentes' },
+    { valor: 'due_soon', etiqueta: 'Vencen esta semana' },
+    { valor: 'ready', etiqueta: 'Para aprobación' },
+    { valor: 'completed', etiqueta: 'Finalizados' },
+]
 
 export function ProjectsListView() {
     const router = useRouter()
-    const [projects, setProjects] = useState<Project[]>([])
-    const [loading, setLoading] = useState(true)
-    const [loadError, setLoadError] = useState<string | null>(null)
-    const [filter, setFilter] = useState<'active' | 'pending' | 'urgent' | 'due_soon' | 'completed' | 'ready'>('active')
-    const [searchQuery, setSearchQuery] = useState('')
-    const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-    const [sortBy, setSortBy] = useState<'priority' | 'deadline'>('deadline')
-    // R14: el cuarto eje de visualización que pide el expediente, además de
-    // estado (los indicadores), prioridad y fecha (el ordenamiento).
-    const [filtroResponsable, setFiltroResponsable] = useState('__TODOS__')
-    const [members, setMembers] = useState<{ id: string; full_name: string }[]>([])
-    const [activeCompletionProjectId, setActiveCompletionProjectId] = useState<string | null>(null)
-    // Lo que sale de contar tareas. El avance que se MUESTRA es el efectivo,
-    // que puede estar pisado por un valor cargado a mano (R11).
-    const [avanceCalculado, setAvanceCalculado] = useState<Record<string, number>>({})
-    const [allTasks, setAllTasks] = useState<TareaConProyecto[]>([])
-    const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
     const { role, user, loading: authLoading } = useAuth()
 
-    useEffect(() => {
-        if (authLoading) return
-        if (!user) {
-            router.replace('/login')
-            return
-        }
+    const [projects, setProjects] = useState<Project[]>([])
+    const [allTasks, setAllTasks] = useState<TareaConProyecto[]>([])
+    const [avanceCalculado, setAvanceCalculado] = useState<Record<string, number>>({})
+    const [ultimaActividad, setUltimaActividad] = useState<Record<string, string>>({})
+    const [members, setMembers] = useState<{ id: string; full_name: string }[]>([])
 
-        setLoading(true)
-        setLoadError(null)
-
-        const t = window.setTimeout(() => {
-            setLoading(false)
-            setLoadError('La carga tardó demasiado. Reintentá.')
-        }, 12000)
-
-        Promise.all([fetchProjects(), fetchTasksAndProgress()]).finally(() => window.clearTimeout(t))
-
-        // Suscripción a cambios en tiempo real de la tabla projects
-        const projectsChannel = supabase
-            .channel('projects-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*', // Escucha INSERT, UPDATE y DELETE
-                    schema: 'public',
-                    table: 'projects'
-                },
-                (payload) => {
-                    console.log('Cambio detectado en projects:', payload)
-
-                    // Recargar proyectos y progreso cuando hay cambios
-                    fetchProjects()
-                    fetchTasksAndProgress()
-                }
-            )
-            .subscribe()
-
-        // Suscripción a cambios en tiempo real de la tabla tasks
-        const tasksChannel = supabase
-            .channel('tasks-changes')
-            .on(
-                'postgres_changes',
-                {
-                    event: '*', // Escucha INSERT, UPDATE y DELETE
-                    schema: 'public',
-                    table: 'tasks'
-                },
-                (payload) => {
-                    console.log('Cambio detectado en tasks:', payload)
-
-                    // Recargar progreso cuando hay cambios en tareas
-                    fetchTasksAndProgress()
-                }
-            )
-            .subscribe()
-
-        // Cleanup: cancelar suscripción cuando el componente se desmonta
-        return () => {
-            supabase.removeChannel(projectsChannel)
-            supabase.removeChannel(tasksChannel)
-        }
-    }, [authLoading, user?.id])
+    const [loading, setLoading] = useState(true)
+    const [loadError, setLoadError] = useState<string | null>(null)
+    const [filter, setFilter] = useState<Filtro>('active')
+    const [searchQuery, setSearchQuery] = useState('')
+    const [filtroResponsable, setFiltroResponsable] = useState('__TODOS__')
+    const [viewMode, setViewMode] = useState<'tabla' | 'tarjetas'>('tabla')
+    const [activeCompletionProjectId, setActiveCompletionProjectId] = useState<string | null>(null)
 
     const fetchProjects = useCallback(async () => {
         try {
             setLoadError(null)
-            const query = supabase
+            const { data } = await supabase
                 .from('projects')
                 .select('*')
                 .eq('habilita', 1)
                 .order('deadline', { ascending: true })
-
-            const { data } = await query
-
             if (data) setProjects(data)
         } catch (error) {
             console.error('Error fetching projects:', error)
@@ -130,7 +71,6 @@ export function ProjectsListView() {
                 .from('tasks')
                 .select('*, projects(*), task_assignees(assignee_name)')
                 .eq('habilita', 1)
-
             if (error) throw error
 
             const tareas = (data ?? []) as unknown as TareaConProyecto[]
@@ -157,65 +97,71 @@ export function ProjectsListView() {
         }
     }, [])
 
+    /**
+     * Última vez que se tocó cada proyecto.
+     *
+     * `projects` no tiene updated_at, pero activity_log guarda cada cambio. Se
+     * traen los más recientes ordenados y se conserva el primero de cada
+     * proyecto, que por el orden es el último movimiento.
+     */
+    const fetchActividad = useCallback(async () => {
+        const { data } = await supabase
+            .from('activity_log')
+            .select('entity_id, entity_type, changed_at')
+            .eq('entity_type', 'project')
+            .order('changed_at', { ascending: false })
+            .limit(400)
 
-    const markProjectAsCompleted = (e: React.MouseEvent, projectId: string) => {
-        e.stopPropagation()
-        setActiveCompletionProjectId(projectId)
-    }
-
-    const updateProjectPriority = async (projectId: string, newPriority: string) => {
-        // Optimistic update
-        const oldProjects = [...projects]
-        setProjects(projects.map(p =>
-            p.id === projectId ? { ...p, priority: newPriority } : p
-        ))
-
-        const { error } = await supabase
-            .from('projects')
-            .update({ priority: newPriority })
-            .eq('id', projectId)
-
-        if (error) {
-            console.error('Error updating priority:', error)
-            setProjects(oldProjects) // Revert
-            // Could add a toast here
+        const mapa: Record<string, string> = {}
+        for (const r of data ?? []) {
+            if (r.changed_at && !mapa[r.entity_id]) mapa[r.entity_id] = r.changed_at
         }
-    }
+        setUltimaActividad(mapa)
+    }, [])
 
-    const handleDeleteProject = async (e: React.MouseEvent, projectId: string) => {
-        e.stopPropagation()
-        if (!confirm('¿Estás seguro de que quieres eliminar este proyecto?')) return
+    useEffect(() => {
+        if (authLoading) return
+        if (!user) { router.replace('/login'); return }
 
-        setDeleteLoading(projectId)
-        try {
-            const { error } = await supabase
-                .from('projects')
-                .update({ habilita: 0 })
-                .eq('id', projectId)
+        setLoading(true)
+        setLoadError(null)
+        const t = window.setTimeout(() => {
+            setLoading(false)
+            setLoadError('La carga tardó demasiado. Reintentá.')
+        }, 12000)
 
-            if (error) throw error
+        Promise.all([fetchProjects(), fetchTasksAndProgress(), fetchActividad()])
+            .finally(() => window.clearTimeout(t))
 
-            // Cascading delete for tasks
-            const { error: tasksError } = await supabase
-                .from('tasks')
-                .update({ habilita: 0 })
-                .eq('project_id', projectId)
+        const canalProyectos = supabase
+            .channel('projects-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+                fetchProjects(); fetchTasksAndProgress(); fetchActividad()
+            })
+            .subscribe()
 
-            if (tasksError) throw tasksError
+        const canalTareas = supabase
+            .channel('tasks-changes')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, () => {
+                fetchTasksAndProgress()
+            })
+            .subscribe()
 
-            fetchProjects()
-        } catch (error) {
-            console.error('Error deleting project:', error)
-            alert('Error al eliminar el proyecto')
-        } finally {
-            setDeleteLoading(null)
+        return () => {
+            supabase.removeChannel(canalProyectos)
+            supabase.removeChannel(canalTareas)
         }
-    }
+    }, [authLoading, user?.id, router, fetchProjects, fetchTasksAndProgress, fetchActividad])
 
     useEffect(() => {
         supabase.from('members').select('id, full_name').eq('habilita', 1).order('full_name')
             .then(({ data }) => { if (data) setMembers(data) })
     }, [])
+
+    const nombrePorMiembro = useMemo(
+        () => Object.fromEntries(members.map(m => [m.id, m.full_name])),
+        [members]
+    )
 
     const projectProgress = useMemo(() => {
         const efectivo: Record<string, number> = { ...avanceCalculado }
@@ -225,492 +171,301 @@ export function ProjectsListView() {
         return efectivo
     }, [projects, avanceCalculado])
 
-    const filteredProjects = projects.filter(project => {
-        const matchesSearch =
-            project.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            (project.area && project.area.toLowerCase().includes(searchQuery.toLowerCase())) ||
-            (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
+    async function eliminarProyecto(p: Project) {
+        if (!confirm(`¿Eliminar el proyecto "${p.title}"? También se eliminan sus tareas.`)) return
+        try {
+            const { data, error } = await supabase
+                .from('projects').update({ habilita: 0 }).eq('id', p.id).select('id')
+            if (error) throw error
+            if (!data || data.length === 0) throw new Error('No tenés permiso para eliminar este proyecto')
 
-        const matchesResponsable =
-            filtroResponsable === '__TODOS__' ||
-            (filtroResponsable === '__SIN__' ? !project.owner_id : project.owner_id === filtroResponsable)
+            const { error: errorTareas } = await supabase
+                .from('tasks').update({ habilita: 0 }).eq('project_id', p.id)
+            if (errorTareas) throw errorTareas
 
-        if (!matchesResponsable) return false
-
-        let matchesFilter = false
-
-        if (filter === 'active') {
-            matchesFilter = project.completed_at === null && (projectProgress[project.id] || 0) < 100
-        } else if (filter === 'pending') {
-            matchesFilter = project.completed_at === null && (projectProgress[project.id] || 0) === 0
-        } else if (filter === 'completed') {
-            matchesFilter = project.completed_at !== null
-        } else if (filter === 'ready') {
-            matchesFilter = project.completed_at === null && (projectProgress[project.id] || 0) === 100
-        } else if (filter === 'urgent') {
-            matchesFilter = project.completed_at === null && project.priority === 'Urgente' && (projectProgress[project.id] || 0) < 100
-        } else if (filter === 'due_soon') {
-            if (project.completed_at || !project.deadline) {
-                matchesFilter = false
-            } else if ((projectProgress[project.id] || 0) === 100) {
-                matchesFilter = false
-            } else {
-                const today = new Date()
-                const currentDay = today.getDay()
-                const distanceToMonday = currentDay === 0 ? 6 : currentDay - 1
-                const monday = new Date(today)
-                monday.setDate(today.getDate() - distanceToMonday)
-                monday.setHours(0, 0, 0, 0)
-                const sunday = new Date(monday)
-                sunday.setDate(monday.getDate() + 6)
-                sunday.setHours(23, 59, 59, 999)
-                const deadline = new Date(project.deadline)
-                matchesFilter = deadline >= monday && deadline <= sunday
-            }
+            fetchProjects()
+        } catch (error) {
+            console.error('Error eliminando el proyecto:', error)
+            alert(error instanceof Error ? error.message : 'Error al eliminar el proyecto')
         }
-
-        return matchesSearch && matchesFilter
-    })
-
-    const priorityOrder: Record<string, number> = { Urgente: 0, Alta: 1, Media: 2, Baja: 3 }
-
-    const isProjectExpired = (p: Project) => {
-        if (p.completed_at) return false
-        if (!p.deadline) return false
-        const limit = new Date(p.deadline)
-        limit.setHours(23, 59, 59, 999)
-        return new Date() > limit
     }
 
-    const sortedProjects = [...filteredProjects].sort((a, b) => {
-        if (sortBy === 'priority') {
-            return (priorityOrder[a.priority ?? 'Baja'] ?? 3) - (priorityOrder[b.priority ?? 'Baja'] ?? 3)
-        }
-        // deadline (default)
-        if (!a.deadline && !b.deadline) return 0
-        if (!a.deadline) return 1
-        if (!b.deadline) return -1
-        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
-    })
+    const filtrados = useMemo(() => projects.filter(p => {
+        const q = searchQuery.toLowerCase()
+        const coincideBusqueda =
+            p.title.toLowerCase().includes(q) ||
+            (p.area?.toLowerCase().includes(q) ?? false) ||
+            (p.description?.toLowerCase().includes(q) ?? false)
+        if (!coincideBusqueda) return false
 
-    if (authLoading) return <div className="p-8">Cargando sesión...</div>
-    if (!user) return null
-    if (loading) return <div className="p-8">Cargando proyectos...</div>
-    if (loadError) {
+        const coincideResponsable =
+            filtroResponsable === '__TODOS__' ||
+            (filtroResponsable === '__SIN__' ? !p.owner_id : p.owner_id === filtroResponsable)
+        if (!coincideResponsable) return false
+
+        const avance = projectProgress[p.id] || 0
+
+        switch (filter) {
+            case 'active': return p.completed_at === null && avance < 100
+            case 'pending': return p.completed_at === null && avance === 0
+            case 'completed': return p.completed_at !== null
+            case 'ready': return p.completed_at === null && avance === 100
+            case 'urgent': return p.completed_at === null && p.priority === 'Urgente' && avance < 100
+            case 'due_soon': {
+                if (p.completed_at || !p.deadline || avance === 100) return false
+                const hoy = new Date()
+                const distanciaALunes = hoy.getDay() === 0 ? 6 : hoy.getDay() - 1
+                const lunes = new Date(hoy)
+                lunes.setDate(hoy.getDate() - distanciaALunes)
+                lunes.setHours(0, 0, 0, 0)
+                const domingo = new Date(lunes)
+                domingo.setDate(lunes.getDate() + 6)
+                domingo.setHours(23, 59, 59, 999)
+                const limite = new Date(p.deadline + 'T00:00:00')
+                return limite >= lunes && limite <= domingo
+            }
+        }
+    }), [projects, searchQuery, filtroResponsable, filter, projectProgress])
+
+    if (loading) {
         return (
-            <div className="p-8">
-                <div className="mb-3 font-medium text-slate-700">{loadError}</div>
-                <Button
-                    variant="outline"
-                    onClick={() => {
-                        setLoading(true)
-                        setLoadError(null)
-                        fetchProjects()
-                        fetchTasksAndProgress()
-                    }}
-                >
-                    Reintentar
-                </Button>
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
-            <div className="max-w-7xl mx-auto">
-                {filter !== 'active' && (
-                    <Button
-                        variant="ghost"
-                        onClick={() => setFilter('active')}
-                        className="mb-4"
-                    >
-                        <ArrowLeft className="w-4 h-4 mr-2" />
-                        Volver a activos
-                    </Button>
-                )}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-                    <div>
-                        <h1 className="text-4xl font-bold text-slate-900 mb-2">Proyectos</h1>
-                        <p className="text-slate-600">Gestiona y da seguimiento a tus proyectos</p>
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-                        <Button variant="outline" onClick={() => router.push('/assignments')} className="w-full sm:w-auto">
-                            <Users className="w-4 h-4 mr-2" />
-                            Asignaciones
-                        </Button>
-                        {role === 'admin' && (
-                            <Button variant="outline" onClick={() => router.push('/members')} className="w-full sm:w-auto">
-                                <Users className="w-4 h-4 mr-2" />
-                                Miembros
-                            </Button>
-                        )}
-                        <div className="w-full sm:w-auto">
-                            <ProjectForm onProjectCreated={fetchProjects} />
-                        </div>
-                    </div>
+        <div className="px-5 py-6 lg:px-7">
+            {/* Encabezado + acción principal */}
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Proyectos</h1>
+                    <p className="mt-0.5 text-sm text-slate-500">Gestiona y da seguimiento a tus proyectos</p>
                 </div>
+                <ProjectForm onProjectCreated={() => { fetchProjects(); fetchActividad() }} />
+            </div>
 
-                {/* Project Summary Dashboard */}
-                <ProjectSummary
-                    projects={projects}
-                    currentFilter={filter}
-                    onFilterChange={setFilter}
-                    projectProgress={projectProgress}
-                />
+            {loadError && (
+                <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    {loadError}
+                </div>
+            )}
 
-                <TaskSummary tasks={allTasks} />
+            <ProjectSummary
+                projects={projects}
+                currentFilter={filter}
+                onFilterChange={setFilter}
+                projectProgress={projectProgress}
+            />
 
-                {/* View Toggle and Search */}
-                <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between items-center">
-                    <div className="relative w-full sm:w-96">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
-                        <Input
-                            placeholder="Buscar por nombre, área o descripción..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10 bg-white"
-                        />
-                    </div>
+            <TaskSummary tasks={allTasks} />
 
-                    <div className="w-full sm:w-56">
+            {/* Contenido principal + columna de contexto */}
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_290px]">
+                <div className="min-w-0">
+                    {/* Buscador y filtros */}
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <div className="relative min-w-[200px] flex-1">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <Input
+                                placeholder="Buscar por nombre, área o descripción..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="border-slate-200 bg-white pl-9 dark:bg-slate-900"
+                            />
+                        </div>
+
                         <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
-                            <SelectTrigger className="bg-white">
+                            <SelectTrigger className="w-[190px] border-slate-200 bg-white dark:bg-slate-900">
                                 <SelectValue placeholder="Responsable" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="__TODOS__">Todos los responsables</SelectItem>
                                 <SelectItem value="__SIN__">Sin responsable</SelectItem>
-                                {members.map((m) => (
+                                {members.map(m => (
                                     <SelectItem key={m.id} value={m.id}>{m.full_name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {/* Sort controls */}
-                        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                            <button
-                                title="Ordenar por prioridad"
-                                onClick={() => setSortBy('priority')}
-                                className={`h-8 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${sortBy === 'priority'
-                                    ? 'bg-white shadow-sm text-slate-900'
-                                    : 'text-slate-500 hover:bg-white/60'
-                                    }`}
-                            >
-                                <Flame className="w-3.5 h-3.5" />
-                                <span>Prioridad</span>
-                            </button>
-                            <button
-                                title="Ordenar por fecha límite"
-                                onClick={() => setSortBy('deadline')}
-                                className={`h-8 px-2.5 rounded-md text-xs font-medium flex items-center gap-1.5 transition-all ${sortBy === 'deadline'
-                                    ? 'bg-white shadow-sm text-slate-900'
-                                    : 'text-slate-500 hover:bg-white/60'
-                                    }`}
-                            >
-                                <Clock3 className="w-3.5 h-3.5" />
-                                <span>Fecha</span>
-                            </button>
-                        </div>
 
-                        {/* View mode toggle */}
-                        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg border border-slate-200">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('grid')}
-                                className={`h-8 w-8 p-0 hover:bg-white ${viewMode === 'grid' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                        {/* Mismo filtro que las tarjetas de arriba: se mantienen sincronizados. */}
+                        <Select value={filter} onValueChange={(v) => setFilter(v as Filtro)}>
+                            <SelectTrigger className="w-[180px] border-slate-200 bg-white dark:bg-slate-900">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {ESTADOS.map(e => (
+                                    <SelectItem key={e.valor} value={e.valor}>{e.etiqueta}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <div className="ml-auto flex items-center gap-0.5 rounded-lg border border-slate-200 bg-white p-0.5 dark:border-slate-800 dark:bg-slate-900">
+                            <button
+                                onClick={() => setViewMode('tabla')}
+                                aria-pressed={viewMode === 'tabla'}
+                                title="Vista de tabla"
+                                className={`rounded-md p-1.5 transition-colors ${viewMode === 'tabla' ? 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
                             >
-                                <LayoutGrid className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setViewMode('list')}
-                                className={`h-8 w-8 p-0 hover:bg-white ${viewMode === 'list' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500'}`}
+                                <List className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => setViewMode('tarjetas')}
+                                aria-pressed={viewMode === 'tarjetas'}
+                                title="Vista de tarjetas"
+                                className={`rounded-md p-1.5 transition-colors ${viewMode === 'tarjetas' ? 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100' : 'text-slate-400 hover:text-slate-600'}`}
                             >
-                                <List className="w-4 h-4" />
-                            </Button>
+                                <LayoutGrid className="h-4 w-4" />
+                            </button>
                         </div>
+                    </div>
+
+                    {viewMode === 'tabla' ? (
+                        <ProjectsTable
+                            proyectos={filtrados}
+                            avance={projectProgress}
+                            responsables={nombrePorMiembro}
+                            ultimaActividad={ultimaActividad}
+                            esAdmin={role === 'admin'}
+                            onEliminar={eliminarProyecto}
+                            onPublicar={(p) => setActiveCompletionProjectId(p.id)}
+                        />
+                    ) : (
+                        <TarjetasProyecto
+                            proyectos={filtrados}
+                            avance={projectProgress}
+                            responsables={nombrePorMiembro}
+                            ultimaActividad={ultimaActividad}
+                            esAdmin={role === 'admin'}
+                            onEliminar={eliminarProyecto}
+                            onPublicar={(p) => setActiveCompletionProjectId(p.id)}
+                        />
+                    )}
+
+                    <div className="mt-5">
+                        <ProjectProgressChart tasks={allTasks} />
                     </div>
                 </div>
 
-                {filteredProjects.length === 0 ? (
-                    <div className="text-center py-16">
-                        <FolderKanban className="w-16 h-16 mx-auto text-slate-300 mb-4" />
-                        <h3 className="text-xl font-semibold text-slate-700 mb-2">
-                            {searchQuery ? 'No se encontraron proyectos' : (filter === 'completed' ? 'No hay proyectos completados' : filter === 'ready' ? 'No hay proyectos listos para publicar' : 'No hay proyectos')}
-                        </h3>
-                        <p className="text-slate-500 mb-6">
-                            {searchQuery ? 'Intenta con otros términos de búsqueda' : (filter === 'completed' ? 'Completa tareas para terminar proyectos' : filter === 'ready' ? 'Completa todas las tareas para mover proyectos aquí' : 'Comienza creando tu primer proyecto')}
-                        </p>
-                        {filter === 'active' && !searchQuery && <ProjectForm onProjectCreated={fetchProjects} />}
-                    </div>
-                ) : (
-                    <>
-                        {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {sortedProjects.map((project) => (
-                                    <Card
-                                        key={project.id}
-                                        className={`relative overflow-hidden hover:shadow-xl transition-all cursor-pointer hover:scale-105 border-l-4 ${project.priority === 'Urgente' ? 'bg-red-100 hover:bg-red-200 border-l-red-500 dark:bg-red-950 dark:hover:bg-red-900 dark:border-l-red-400' :
-                                            project.priority === 'Alta' ? 'bg-orange-100 hover:bg-orange-200 border-l-orange-500 dark:bg-orange-950 dark:hover:bg-orange-900 dark:border-l-orange-400' :
-                                                project.priority === 'Media' ? 'bg-amber-100 hover:bg-amber-200 border-l-amber-500 dark:bg-amber-950 dark:hover:bg-amber-900 dark:border-l-amber-400' :
-                                                    'bg-emerald-100 hover:bg-emerald-200 border-l-emerald-500 dark:bg-emerald-950 dark:hover:bg-emerald-900 dark:border-l-emerald-400'
-                                            }`}
-                                        onClick={() => router.push(`/projects/${project.id}`)}
-                                    >
-                                        {isProjectExpired(project) && (
-                                            <div className="absolute top-4 -left-10 w-36 transform -rotate-45 bg-red-600/80 backdrop-blur-sm text-white text-center text-[9px] font-bold py-0.5 shadow-sm uppercase tracking-wider z-10 pointer-events-none">
-                                                Vencido
-                                            </div>
-                                        )}
-                                        <CardHeader className="pb-3">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <CardTitle className="text-lg font-bold line-clamp-2">
-                                                    {project.title}
-                                                </CardTitle>
-                                                {role === 'admin' ? (
-                                                    <div onClick={(e) => e.stopPropagation()} className="flex gap-1 items-center">
-                                                        <Select
-                                                            value={project.priority || 'Media'}
-                                                            onValueChange={(value) => updateProjectPriority(project.id, value)}
-                                                        >
-                                                            <SelectTrigger className={`w-[110px] h-8 ml-2 font-semibold ${project.priority === 'Urgente' ? 'bg-red-200 text-red-900 border-red-400 dark:bg-red-700 dark:text-red-100 dark:border-red-500' :
-                                                                project.priority === 'Alta' ? 'bg-orange-200 text-orange-900 border-orange-400 dark:bg-orange-700 dark:text-orange-100 dark:border-orange-500' :
-                                                                    project.priority === 'Media' ? 'bg-amber-200 text-amber-900 border-amber-400 dark:bg-amber-700 dark:text-amber-100 dark:border-amber-500' :
-                                                                        'bg-emerald-200 text-emerald-900 border-emerald-400 dark:bg-emerald-700 dark:text-emerald-100 dark:border-emerald-500'
-                                                                }`}>
-                                                                <SelectValue />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="Baja">Baja</SelectItem>
-                                                                <SelectItem value="Media">Media</SelectItem>
-                                                                <SelectItem value="Alta">Alta</SelectItem>
-                                                                <SelectItem value="Urgente">Urgente</SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
-                                                            disabled={deleteLoading === project.id}
-                                                            onClick={(e) => handleDeleteProject(e, project.id)}
-                                                        >
-                                                            <Trash2 className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-                                                ) : (
-                                                    <Badge
-                                                        className={`ml-2 shrink-0 font-semibold border ${project.priority === 'Urgente' ? 'bg-red-200 text-red-900 border-red-400 dark:bg-red-700 dark:text-red-100 dark:border-red-500' :
-                                                            project.priority === 'Alta' ? 'bg-orange-200 text-orange-900 border-orange-400 dark:bg-orange-700 dark:text-orange-100 dark:border-orange-500' :
-                                                                project.priority === 'Media' ? 'bg-amber-200 text-amber-900 border-amber-400 dark:bg-amber-700 dark:text-amber-100 dark:border-amber-500' :
-                                                                    'bg-emerald-200 text-emerald-900 border-emerald-400 dark:bg-emerald-700 dark:text-emerald-100 dark:border-emerald-500'
-                                                            }`}
-                                                    >
-                                                        {project.priority}
-                                                    </Badge>
-                                                )}
-                                            </div>
-                                            <div className="flex gap-2 text-xs text-slate-500">
-                                                {project.area && <span className="bg-slate-100 px-2 py-1 rounded">{project.area}</span>}
-                                                {project.type && <span className="bg-slate-100 px-2 py-1 rounded">{project.type}</span>}
-                                            </div>
-                                        </CardHeader>
-                                        <CardContent>
-                                            {project.description && (
-                                                <p className="text-sm text-slate-600 mb-4 line-clamp-2">{project.description}</p>
-                                            )}
-
-                                            {/* Progress Bar */}
-                                            <div className="mb-3">
-                                                <div className="flex justify-between text-xs text-slate-600 mb-1">
-                                                    <span>Progreso</span>
-                                                    <span className="font-semibold">{projectProgress[project.id] || 0}%</span>
-                                                </div>
-                                                <div className="w-full bg-slate-200 rounded-full h-2">
-                                                    <div
-                                                        className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all"
-                                                        style={{ width: `${projectProgress[project.id] || 0}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${project.status === 'En Progreso' ? 'bg-green-100 text-green-800' :
-                                                        project.status === 'Completado' ? 'bg-blue-100 text-blue-800' :
-                                                            'bg-yellow-100 text-yellow-800'
-                                                        }`}>
-                                                        {project.status}
-                                                    </span>
-                                                </div>
-                                                {project.deadline && (
-                                                    <div className="flex items-center gap-1 text-slate-500">
-                                                        <Calendar className="w-4 h-4" />
-                                                        <span className="text-xs">
-                                                            {new Date(project.deadline).toLocaleDateString()}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            {/* Finalized Project Link */}
-                                            {project.completed_at && project.upload_link && (
-                                                <div className="mt-3 pt-3 border-t border-slate-200">
-                                                    <a
-                                                        href={project.upload_link}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs text-blue-600 hover:text-blue-800 font-bold underline flex items-center gap-1"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <CheckCircle2 className="w-3 h-3" />
-                                                        Ver material finalizado →
-                                                    </a>
-                                                </div>
-                                            )}
-
-                                            {/* Action Buttons */}
-                                            {(projectProgress[project.id] || 0) === 100 && !project.completed_at && role === 'admin' && (
-                                                <div className="mt-4 pt-3 border-t border-slate-100 flex justify-end">
-                                                    <Button
-                                                        size="sm"
-                                                        className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto"
-                                                        onClick={(e) => markProjectAsCompleted(e, project.id)}
-                                                    >
-                                                        <CheckCircle2 className="w-4 h-4 mr-2" />
-                                                        Publicar / Finalizar
-                                                    </Button>
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
-                                {sortedProjects.map((project, index) => (
-                                    <div
-                                        key={project.id}
-                                        onClick={() => router.push(`/projects/${project.id}`)}
-                                        className={`relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 cursor-pointer transition-colors border-l-4 ${index !== filteredProjects.length - 1 ? 'border-b border-slate-100' : ''} ${project.priority === 'Urgente' ? 'bg-red-50 hover:bg-red-100 border-l-red-500 dark:bg-red-950/60 dark:hover:bg-red-900/60 dark:border-l-red-400' :
-                                            project.priority === 'Alta' ? 'bg-orange-50 hover:bg-orange-100 border-l-orange-500 dark:bg-orange-950/60 dark:hover:bg-orange-900/60 dark:border-l-orange-400' :
-                                                project.priority === 'Media' ? 'bg-amber-50 hover:bg-amber-100 border-l-amber-500 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 dark:border-l-amber-400' :
-                                                    'bg-emerald-50 hover:bg-emerald-100 border-l-emerald-500 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 dark:border-l-emerald-400'
-                                            }`}
-                                    >
-                                        {isProjectExpired(project) && (
-                                            <div className="absolute top-2 -left-10 w-32 transform -rotate-45 bg-red-600/80 backdrop-blur-sm text-white text-center text-[9px] font-bold py-0.5 shadow-sm uppercase tracking-wider z-10 pointer-events-none">
-                                                Vencido
-                                            </div>
-                                        )}
-                                        <div className="flex-1 min-w-0 mr-4 mb-3 sm:mb-0">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h3 className="font-semibold text-slate-900 truncate">{project.title}</h3>
-                                                {project.area && (
-                                                    <span className="hidden sm:inline-block px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
-                                                        {project.area}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-4 text-xs text-slate-500">
-                                                {project.deadline && (
-                                                    <div className="flex items-center gap-1">
-                                                        <Calendar className="w-3 h-3" />
-                                                        <span>{new Date(project.deadline).toLocaleDateString()}</span>
-                                                    </div>
-                                                )}
-                                                <span className={`${project.status === 'En Progreso' ? 'text-green-600' :
-                                                    project.status === 'Completado' ? 'text-blue-600' :
-                                                        'text-yellow-600'
-                                                    }`}>
-                                                    {project.status}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                                            {/* Progress (Mini) */}
-                                            <div className="flex items-center gap-2 w-24">
-                                                <div className="w-full bg-slate-200 rounded-full h-1.5">
-                                                    <div
-                                                        className="bg-blue-600 h-1.5 rounded-full"
-                                                        style={{ width: `${projectProgress[project.id] || 0}%` }}
-                                                    />
-                                                </div>
-                                                <span className="text-xs font-medium text-slate-600 text-right w-8">
-                                                    {projectProgress[project.id] || 0}%
-                                                </span>
-                                            </div>
-
-                                            {/* Priority Selector (Admin) or Badge */}
-                                            {role === 'admin' ? (
-                                                <div onClick={(e) => e.stopPropagation()} className="flex gap-2 items-center">
-                                                    <Select
-                                                        value={project.priority || 'Media'}
-                                                        onValueChange={(value) => updateProjectPriority(project.id, value)}
-                                                    >
-                                                        <SelectTrigger className={`w-[100px] h-8 text-xs font-semibold ${project.priority === 'Urgente' ? 'bg-red-200 text-red-900 border-red-400 dark:bg-red-700 dark:text-red-100 dark:border-red-500' :
-                                                            project.priority === 'Alta' ? 'bg-orange-200 text-orange-900 border-orange-400 dark:bg-orange-700 dark:text-orange-100 dark:border-orange-500' :
-                                                                project.priority === 'Media' ? 'bg-amber-200 text-amber-900 border-amber-400 dark:bg-amber-700 dark:text-amber-100 dark:border-amber-500' :
-                                                                    'bg-emerald-200 text-emerald-900 border-emerald-400 dark:bg-emerald-700 dark:text-emerald-100 dark:border-emerald-500'
-                                                            }`}>
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="Baja">Baja</SelectItem>
-                                                            <SelectItem value="Media">Media</SelectItem>
-                                                            <SelectItem value="Alta">Alta</SelectItem>
-                                                            <SelectItem value="Urgente">Urgente</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
-                                                        disabled={deleteLoading === project.id}
-                                                        onClick={(e) => handleDeleteProject(e, project.id)}
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            ) : (
-                                                <Badge
-                                                    className={`ml-2 shrink-0 font-semibold border ${project.priority === 'Urgente' ? 'bg-red-200 text-red-900 border-red-400 dark:bg-red-700 dark:text-red-100 dark:border-red-500' :
-                                                        project.priority === 'Alta' ? 'bg-orange-200 text-orange-900 border-orange-400 dark:bg-orange-700 dark:text-orange-100 dark:border-orange-500' :
-                                                            project.priority === 'Media' ? 'bg-amber-200 text-amber-900 border-amber-400 dark:bg-amber-700 dark:text-amber-100 dark:border-amber-500' :
-                                                                'bg-emerald-200 text-emerald-900 border-emerald-400 dark:bg-emerald-700 dark:text-emerald-100 dark:border-emerald-500'
-                                                        }`}
-                                                >
-                                                    {project.priority}
-                                                </Badge>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </>
-                )}
+                <aside className="min-w-0">
+                    <PanelLateral proyectos={projects} tareas={allTasks} />
+                </aside>
             </div>
 
-            {/* Project Progress Chart */}
-            <div className="max-w-7xl mx-auto mt-12 pb-12">
-                <ProjectProgressChart tasks={allTasks} />
-            </div>
-
-            {/* Completion Modal */}
             {activeCompletionProjectId && (
                 <ProjectCompletionModal
                     projectId={activeCompletionProjectId}
                     onClose={() => {
                         setActiveCompletionProjectId(null)
                         fetchProjects()
+                        fetchTasksAndProgress()
                     }}
                 />
             )}
+        </div>
+    )
+}
 
+/**
+ * Vista de tarjetas.
+ *
+ * Muestra lo mismo que la tabla. Se conserva porque con pocos proyectos la
+ * grilla se recorre más rápido que una tabla de ocho columnas.
+ */
+function TarjetasProyecto({ proyectos, avance, responsables, ultimaActividad, esAdmin, onEliminar, onPublicar }: {
+    proyectos: Project[]
+    avance: Record<string, number>
+    responsables: Record<string, string>
+    ultimaActividad: Record<string, string>
+    esAdmin: boolean
+    onEliminar: (p: Project) => void
+    onPublicar: (p: Project) => void
+}) {
+    const router = useRouter()
+    const [menu, setMenu] = useState<string | null>(null)
+
+    if (proyectos.length === 0) {
+        return (
+            <div className="rounded-xl border border-slate-200 bg-white py-14 text-center text-sm text-slate-400 dark:border-slate-800 dark:bg-slate-900">
+                No hay proyectos que coincidan con los filtros.
+            </div>
+        )
+    }
+
+    return (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+            {proyectos.map(p => {
+                const pct = avance[p.id] ?? 0
+                const resp = responsables[p.owner_id ?? '']
+                return (
+                    <div key={p.id} className="relative rounded-xl border border-slate-200 bg-white p-4 transition-shadow hover:shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div className="mb-2 flex items-start justify-between gap-2">
+                            <Link href={`/projects/${p.id}`} className="min-w-0">
+                                <span className="block truncate text-sm font-medium text-slate-800 hover:text-[#0065ff] dark:text-slate-100">{p.title}</span>
+                                <span className="block truncate text-xs text-slate-400">{p.description || p.area || '—'}</span>
+                            </Link>
+                            <button
+                                onClick={() => setMenu(menu === p.id ? null : p.id)}
+                                aria-label={`Acciones de ${p.title}`}
+                                className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+                            >
+                                <MoreVertical className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        {menu === p.id && (
+                            <>
+                                <div className="fixed inset-0 z-10" onClick={() => setMenu(null)} aria-hidden="true" />
+                                <div className="absolute right-3 top-11 z-20 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800">
+                                    <button onClick={() => { setMenu(null); router.push(`/projects/${p.id}`) }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700">
+                                        <Eye className="h-3.5 w-3.5" /> Ver detalle
+                                    </button>
+                                    {esAdmin && pct === 100 && !p.completed_at && (
+                                        <button onClick={() => { setMenu(null); onPublicar(p) }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-[#0065ff] hover:bg-blue-50 dark:hover:bg-slate-700">
+                                            <Upload className="h-3.5 w-3.5" /> Publicar
+                                        </button>
+                                    )}
+                                    {esAdmin && (
+                                        <button onClick={() => { setMenu(null); onEliminar(p) }} className="flex w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-xs text-red-600 hover:bg-red-50 dark:border-slate-700">
+                                            <Trash2 className="h-3.5 w-3.5" /> Eliminar
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
+
+                        <div className="mb-3">
+                            <div className="mb-1 flex items-center justify-between text-xs">
+                                <span className="text-slate-400">Progreso</span>
+                                <span className="font-medium text-slate-700 tabular-nums dark:text-slate-200">{pct}%</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-slate-100 dark:bg-slate-800">
+                                <div className="h-1.5 rounded-full bg-[#0065ff] transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 text-xs">
+                            {resp ? (
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                    <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold ${tonoAvatar(resp)}`}>
+                                        {iniciales(resp)}
+                                    </span>
+                                    <span className="truncate text-slate-500">{resp}</span>
+                                </span>
+                            ) : (
+                                <span className="italic text-slate-300">sin responsable</span>
+                            )}
+                            <span className="shrink-0 text-slate-400">{fechaCorta(p.deadline)}</span>
+                        </div>
+
+                        <p className="mt-2 border-t border-slate-50 pt-2 text-[11px] text-slate-400 dark:border-slate-800">
+                            {tiempoRelativo(ultimaActividad[p.id] ?? p.created_at)}
+                        </p>
+                    </div>
+                )
+            })}
         </div>
     )
 }
