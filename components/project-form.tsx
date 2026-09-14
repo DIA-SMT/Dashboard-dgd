@@ -23,7 +23,10 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
         area: '',
         type: '',
         priority: 'Media',
-        deadline: ''
+        deadline: '',
+        start_date: '',
+        objectives: '',
+        scope: ''
     })
     const [existingAreas, setExistingAreas] = useState<string[]>([])
     const [showSuggestions, setShowSuggestions] = useState(false)
@@ -68,6 +71,9 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
                 {
                     ...formData,
                     deadline: formData.deadline || null,
+                    start_date: formData.start_date || null,
+                    objectives: formData.objectives || null,
+                    scope: formData.scope || null,
                     status: 'Pendiente'
                 }
             ]).select().single()
@@ -76,7 +82,7 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
                 router.push(`/projects/${data.id}`)
                 onProjectCreated() // Update list in background or for back navigation
                 setOpen(false)
-                setFormData({ title: '', description: '', area: '', type: '', priority: 'Media', deadline: '' })
+                setFormData({ title: '', description: '', area: '', type: '', priority: 'Media', deadline: '', start_date: '', objectives: '', scope: '' })
             } else {
                 // Fallback if no data returned for some reason
                 setOpen(false)
@@ -102,7 +108,7 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
             <DialogTrigger asChild>
                 <Button>Nuevo Proyecto</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[560px]">
                 <DialogHeader>
                     <DialogTitle>Crear Nuevo Proyecto</DialogTitle>
                 </DialogHeader>
@@ -123,6 +129,26 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
                             value={formData.description}
                             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             required
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="objectives">Objetivos</Label>
+                        <Textarea
+                            id="objectives"
+                            value={formData.objectives}
+                            onChange={(e) => setFormData({ ...formData, objectives: e.target.value })}
+                            placeholder="Qué se busca lograr con el proyecto"
+                            rows={3}
+                        />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label htmlFor="scope">Alcance</Label>
+                        <Textarea
+                            id="scope"
+                            value={formData.scope}
+                            onChange={(e) => setFormData({ ...formData, scope: e.target.value })}
+                            placeholder="Qué incluye y qué queda afuera"
+                            rows={3}
                         />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
@@ -188,11 +214,22 @@ export function ProjectForm({ onProjectCreated }: { onProjectCreated: () => void
                             </Select>
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="deadline">Fecha Límite</Label>
+                            <Label htmlFor="start_date">Fecha de inicio</Label>
+                            <Input
+                                id="start_date"
+                                type="date"
+                                value={formData.start_date}
+                                max={formData.deadline || undefined}
+                                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                            />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="deadline">Fecha estimada de finalización</Label>
                             <Input
                                 id="deadline"
                                 type="date"
                                 value={formData.deadline}
+                                min={formData.start_date || undefined}
                                 onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
                                 required
                             />

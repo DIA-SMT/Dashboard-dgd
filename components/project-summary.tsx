@@ -1,11 +1,11 @@
 'use client'
 
 import { Card, CardContent } from "@/components/ui/card"
-import { FolderKanban, AlertTriangle, CalendarClock, ClipboardCheck, CheckCircle2 } from "lucide-react"
+import { FolderKanban, CircleDashed, AlertTriangle, CalendarClock, ClipboardCheck, CheckCircle2 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { Project } from "@/types"
 
-type Filtro = 'active' | 'urgent' | 'due_soon' | 'completed' | 'ready'
+type Filtro = 'active' | 'pending' | 'urgent' | 'due_soon' | 'completed' | 'ready'
 
 interface ProjectSummaryProps {
     projects: Project[]
@@ -33,8 +33,8 @@ function Indicador({ icono: Icono, etiqueta, valor, tono, activo, onClick }: {
         <button
             onClick={onClick}
             aria-pressed={activo}
-            className={`flex w-full flex-1 items-center gap-3 px-4 py-3 text-left transition-colors ${
-                activo ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'hover:bg-slate-50/70'
+            className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                activo ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'bg-white hover:bg-slate-50/70'
             }`}
         >
             <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${tono}`}>
@@ -57,6 +57,11 @@ export function ProjectSummary({ projects, currentFilter, onFilterChange, projec
 
     // Active: Not completed AND progress < 100
     const activeProjects = projects.filter(p => !p.completed_at && (projectProgress[p.id] || 0) < 100).length
+
+    // Pendientes: sin completar y sin una sola tarea terminada. Se distingue de
+    // "Activos" —que incluye todo lo no finalizado— porque lo que interesa ver
+    // acá es lo que todavía no arrancó.
+    const pendingProjects = projects.filter(p => !p.completed_at && (projectProgress[p.id] || 0) === 0).length
 
     // Ready: Not completed AND progress === 100
     const readyProjects = projects.filter(p => !p.completed_at && (projectProgress[p.id] || 0) === 100).length
@@ -93,6 +98,7 @@ export function ProjectSummary({ projects, currentFilter, onFilterChange, projec
 
     const indicadores: { filtro: Filtro; icono: LucideIcon; etiqueta: string; valor: number; tono: string }[] = [
         { filtro: 'active', icono: FolderKanban, etiqueta: 'Activos', valor: activeProjects, tono: 'bg-blue-50 text-blue-700' },
+        { filtro: 'pending', icono: CircleDashed, etiqueta: 'Pendientes', valor: pendingProjects, tono: 'bg-slate-100 text-slate-600' },
         { filtro: 'urgent', icono: AlertTriangle, etiqueta: 'Urgentes', valor: urgentProjects, tono: 'bg-red-50 text-red-700' },
         { filtro: 'due_soon', icono: CalendarClock, etiqueta: 'Vencen esta semana', valor: dueSoonProjects, tono: 'bg-amber-50 text-amber-700' },
         { filtro: 'ready', icono: ClipboardCheck, etiqueta: 'Para aprobación', valor: readyProjects, tono: 'bg-violet-50 text-violet-700' },
@@ -102,7 +108,11 @@ export function ProjectSummary({ projects, currentFilter, onFilterChange, projec
     return (
         <Card className="mb-6 overflow-hidden border-slate-200 bg-white shadow-sm">
             <CardContent className="p-0">
-                <div className="flex flex-col divide-y divide-slate-100 md:flex-row md:divide-x md:divide-y-0">
+                {/* Grilla y no fila flex: con seis indicadores, flex-1 no alcanza a
+                    encogerlos (min-width:auto) y el último se desbordaba de la
+                    tarjeta. La grilla envuelve en vez de desbordar, y el gap-px
+                    sobre un fondo gris hace de separador en los dos ejes. */}
+                <div className="grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 xl:grid-cols-6">
                     {indicadores.map((ind) => (
                         <Indicador
                             key={ind.filtro}

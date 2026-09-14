@@ -16,6 +16,7 @@ import { Calendar, FolderKanban, Users, Search, ArrowLeft, CheckCircle2, LayoutG
 import { ProjectProgressChart } from '@/components/project-progress-chart'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { DailyNotesPanel } from '@/components/daily-notes-panel'
+import { TaskSummary, type TareaConProyecto } from '@/components/task-summary'
 import { countsTowardProgress } from '@/lib/task-status'
 
 type ProjectProgress = {
@@ -30,13 +31,14 @@ export function ProjectsListView() {
     const [projects, setProjects] = useState<Project[]>([])
     const [loading, setLoading] = useState(true)
     const [loadError, setLoadError] = useState<string | null>(null)
-    const [filter, setFilter] = useState<'active' | 'urgent' | 'due_soon' | 'completed' | 'ready'>('active')
+    const [filter, setFilter] = useState<'active' | 'pending' | 'urgent' | 'due_soon' | 'completed' | 'ready'>('active')
     const [searchQuery, setSearchQuery] = useState('')
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
     const [sortBy, setSortBy] = useState<'priority' | 'deadline'>('deadline')
     const [chartData, setChartData] = useState<ProjectProgress[]>([])
     const [activeCompletionProjectId, setActiveCompletionProjectId] = useState<string | null>(null)
     const [projectProgress, setProjectProgress] = useState<Record<string, number>>({})
+    const [allTasks, setAllTasks] = useState<TareaConProyecto[]>([])
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
     const [dailyNotesOpen, setDailyNotesOpen] = useState(false)
     const [notesCount, setNotesCount] = useState(0)
@@ -230,6 +232,7 @@ export function ProjectsListView() {
                 })
             }
 
+            setAllTasks((allTasks ?? []) as unknown as TareaConProyecto[])
             setChartData(Array.from(progressMap.values()).sort((a, b) => b.total - a.total))
             setProjectProgress(progressState)
         } catch (error) {
@@ -303,6 +306,8 @@ export function ProjectsListView() {
 
         if (filter === 'active') {
             matchesFilter = project.completed_at === null && (projectProgress[project.id] || 0) < 100
+        } else if (filter === 'pending') {
+            matchesFilter = project.completed_at === null && (projectProgress[project.id] || 0) === 0
         } else if (filter === 'completed') {
             matchesFilter = project.completed_at !== null
         } else if (filter === 'ready') {
@@ -417,6 +422,8 @@ export function ProjectsListView() {
                     onFilterChange={setFilter}
                     projectProgress={projectProgress}
                 />
+
+                <TaskSummary tasks={allTasks} />
 
                 {/* View Toggle and Search */}
                 <div className="flex flex-col sm:flex-row gap-4 mb-6 justify-between items-center">

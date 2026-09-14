@@ -13,8 +13,9 @@ import { TaskForm } from '@/components/task-form'
 import { TaskEditForm } from '@/components/task-edit-form'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskCompletionModal } from '@/components/task-completion-modal'
-import { ArrowLeft, Calendar, CheckCircle2, Circle, Clock, PauseCircle, Ban, AlertTriangle, Pencil, Check, X, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, CalendarPlus, CheckCircle2, Circle, Clock, PauseCircle, Ban, AlertTriangle, Pencil, Check, X, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
     TASK_STATUSES,
     DEFAULT_TASK_STATUS,
@@ -24,6 +25,82 @@ import {
     getDeadlineLabel,
     getDeadlineColor,
 } from '@/lib/task-status'
+
+/**
+ * Bloque de texto largo con edición en línea.
+ *
+ * Objetivos y alcance necesitaban exactamente el mismo comportamiento que ya
+ * tenían el título y la fecha límite, pero repetir esa maquinaria por cada
+ * campo eran treinta líneas más cada vez. El componente maneja su propio
+ * estado de edición y le deja al padre sólo el guardado.
+ */
+function CampoTextoEditable({ etiqueta, valor, editable, placeholder, onGuardar }: {
+    etiqueta: string
+    valor: string | null
+    editable: boolean
+    placeholder: string
+    onGuardar: (nuevo: string | null) => Promise<void>
+}) {
+    const [editando, setEditando] = useState(false)
+    const [borrador, setBorrador] = useState(valor ?? '')
+    const [guardando, setGuardando] = useState(false)
+
+    // Si no hay nada cargado y tampoco se puede editar, el bloque no aporta.
+    if (!valor && !editable) return null
+
+    async function guardar() {
+        setGuardando(true)
+        try {
+            await onGuardar(borrador.trim() || null)
+            setEditando(false)
+        } finally {
+            setGuardando(false)
+        }
+    }
+
+    return (
+        <div className="mb-4">
+            <div className="mb-1 flex items-center gap-1">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{etiqueta}</h3>
+                {editable && !editando && (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => { setBorrador(valor ?? ''); setEditando(true) }}
+                        className="h-6 px-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    >
+                        <Pencil className="h-3 w-3" />
+                    </Button>
+                )}
+            </div>
+
+            {editando ? (
+                <div className="space-y-2">
+                    <Textarea
+                        value={borrador}
+                        onChange={(e) => setBorrador(e.target.value)}
+                        placeholder={placeholder}
+                        rows={3}
+                        autoFocus
+                    />
+                    <div className="flex gap-1">
+                        <Button size="sm" onClick={guardar} disabled={guardando}>
+                            <Check className="mr-1 h-3.5 w-3.5" />
+                            Guardar
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditando(false)} disabled={guardando}>
+                            <X className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                </div>
+            ) : (
+                <p className={`whitespace-pre-wrap text-sm ${valor ? 'text-slate-600' : 'italic text-slate-400'}`}>
+                    {valor || 'Sin cargar'}
+                </p>
+            )}
+        </div>
+    )
+}
 
 type TaskWithAssignees = Task & {
     assignees: TaskAssignee[]
@@ -41,6 +118,8 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [editedTitle, setEditedTitle] = useState('')
     const [isEditingDeadline, setIsEditingDeadline] = useState(false)
     const [editedDeadline, setEditedDeadline] = useState('')
+    const [isEditingStartDate, setIsEditingStartDate] = useState(false)
+    const [editedStartDate, setEditedStartDate] = useState('')
 
     const fetchProjectData = useCallback(async () => {
         try {
@@ -176,6 +255,31 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             alert('No se pudo actualizar la fecha límite del proyecto')
             // Rollback
             setProject({ ...project, deadline: oldDeadline })
+        }
+    }
+
+    /**
+     * Guarda un campo del proyecto con actualización optimista y rollback.
+     *
+     * Sigue el patrón de updateProjectTitle y handleUpdateDeadline, pero sin
+     * repetirlo por cada campo nuevo: objetivos, alcance y fecha de inicio
+     * pasan todos por acá.
+     */
+    const actualizarCampo = async (campo: 'objectives' | 'scope' | 'start_date', valor: string | null) => {
+        if (!project) return
+        const anterior = project[campo]
+
+        setProject({ ...project, [campo]: valor })
+
+        const { error } = await supabase
+            .from('projects')
+            .update({ [campo]: valor })
+            .eq('id', projectId)
+
+        if (error) {
+            console.error(`Error actualizando ${campo}:`, error)
+            alert('No se pudo guardar el cambio')
+            setProject({ ...project, [campo]: anterior })
         }
     }
 
@@ -344,6 +448,21 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                 {project.description && (
                                     <p className="text-slate-600 mb-4">{project.description}</p>
                                 )}
+
+                                <CampoTextoEditable
+                                    etiqueta="Objetivos"
+                                    valor={project.objectives}
+                                    editable={role === 'admin' && !project.completed_at}
+                                    placeholder="Qué se busca lograr con el proyecto"
+                                    onGuardar={(v) => actualizarCampo('objectives', v)}
+                                />
+                                <CampoTextoEditable
+                                    etiqueta="Alcance"
+                                    valor={project.scope}
+                                    editable={role === 'admin' && !project.completed_at}
+                                    placeholder="Qué incluye y qué queda afuera"
+                                    onGuardar={(v) => actualizarCampo('scope', v)}
+                                />
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     {project.area && (
                                         <Badge variant="outline">{project.area}</Badge>
@@ -358,6 +477,64 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                         {project.status}
                                     </Badge>
                                 </div>
+                                {(project.start_date || (role === 'admin' && !project.completed_at)) && (
+                                    <div className="mb-1 flex items-center gap-2 text-slate-600">
+                                        <CalendarPlus className="w-4 h-4 shrink-0" />
+                                        {isEditingStartDate ? (
+                                            <div className="flex items-center gap-1">
+                                                <Input
+                                                    type="date"
+                                                    value={editedStartDate}
+                                                    max={project.deadline ? project.deadline.slice(0, 10) : undefined}
+                                                    onChange={(e) => setEditedStartDate(e.target.value)}
+                                                    className="h-8 w-[150px]"
+                                                    autoFocus
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 px-2"
+                                                    onClick={async () => {
+                                                        await actualizarCampo('start_date', editedStartDate || null)
+                                                        setIsEditingStartDate(false)
+                                                    }}
+                                                >
+                                                    <Check className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 px-2"
+                                                    onClick={() => setIsEditingStartDate(false)}
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <span className="text-sm">
+                                                    Inicio: {project.start_date
+                                                        ? new Date(project.start_date + 'T00:00:00').toLocaleDateString()
+                                                        : <span className="italic text-slate-400">sin cargar</span>}
+                                                </span>
+                                                {role === 'admin' && !project.completed_at && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            setEditedStartDate(project.start_date ? project.start_date.slice(0, 10) : '')
+                                                            setIsEditingStartDate(true)
+                                                        }}
+                                                        className="h-7 px-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+
                                 {(project.deadline || (role === 'admin' && !project.completed_at)) && (
                                     <div className="flex items-center gap-2 text-slate-600">
                                         <Calendar className="w-4 h-4 shrink-0" />
