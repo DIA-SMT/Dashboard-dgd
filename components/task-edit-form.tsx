@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { X, Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { TASK_STATUSES, DEFAULT_TASK_STATUS } from '@/lib/task-status'
 
 type TaskWithAssignees = Task & {
     assignees: TaskAssignee[]
@@ -35,7 +36,7 @@ export function TaskEditForm({
     const [showSuggestions, setShowSuggestions] = useState(false)
     const [formData, setFormData] = useState({
         title: task.title,
-        status: task.status || 'Sin empezar',
+        status: task.status || DEFAULT_TASK_STATUS,
         deadline: task.deadline || '',
         notes: task.notes || '',
         link: task.link || ''
@@ -252,9 +253,9 @@ export function TaskEditForm({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Sin empezar">Sin empezar</SelectItem>
-                                    <SelectItem value="En desarrollo">En desarrollo</SelectItem>
-                                    <SelectItem value="Terminada">Terminada</SelectItem>
+                                    {TASK_STATUSES.map((estado) => (
+                                        <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>

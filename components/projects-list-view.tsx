@@ -16,6 +16,7 @@ import { Calendar, FolderKanban, Users, Search, ArrowLeft, CheckCircle2, LayoutG
 import { ProjectProgressChart } from '@/components/project-progress-chart'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { DailyNotesPanel } from '@/components/daily-notes-panel'
+import { countsTowardProgress } from '@/lib/task-status'
 
 type ProjectProgress = {
     name: string
@@ -187,6 +188,9 @@ export function ProjectsListView() {
                         })
                     }
 
+                    // Las canceladas no cuentan: ni como hechas ni como pendientes.
+                    if (!countsTowardProgress(task.status)) return
+
                     const stats = progressMap.get(projectName)!
                     stats.total++
                     if (task.status === 'Terminada') {
@@ -210,6 +214,7 @@ export function ProjectsListView() {
 
                 allTasks.forEach((task) => {
                     if (!task.project_id) return
+                    if (!countsTowardProgress(task.status)) return
                     if (!projectStats[task.project_id]) {
                         projectStats[task.project_id] = { total: 0, completed: 0 }
                     }

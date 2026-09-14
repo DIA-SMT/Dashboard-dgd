@@ -8,7 +8,13 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { TaskCompletionModal } from '@/components/task-completion-modal'
-import { X, CheckCircle2, Clock, CalendarDays, ExternalLink } from 'lucide-react'
+import { X, CheckCircle2, Clock, CalendarDays, ExternalLink, AlertTriangle } from 'lucide-react'
+import {
+    getStatusColor,
+    getDeadlineState,
+    getDeadlineLabel,
+    getDeadlineColor,
+} from '@/lib/task-status'
 
 type TaskWithProject = Task & {
     projects: {
@@ -40,7 +46,7 @@ export function UserTasksPanel({ isOpen, onClose }: UserTasksPanelProps) {
                         title
                     )
                 `)
-                .neq('status', 'Terminada') // Only show pending/in-progress tasks
+                .not('status', 'in', '("Terminada","Cancelada")') // Solo trabajo pendiente
                 .eq('habilita', 1)
                 .order('created_at', { ascending: false })
 
@@ -183,13 +189,23 @@ export function UserTasksPanel({ isOpen, onClose }: UserTasksPanelProps) {
                                         <MarqueeBadge className="mb-2 max-w-[70%]" title={task.projects?.title}>
                                             {task.projects?.title || 'Sin proyecto'}
                                         </MarqueeBadge>
-                                        <Badge className={`shrink-0 ${task.status === 'En desarrollo' ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
-                                            }`}>
+                                        <Badge className={`shrink-0 ${getStatusColor(task.status)}`}>
                                             {task.status}
                                         </Badge>
                                     </div>
 
                                     <h3 className="font-semibold text-slate-900 mb-2">{task.title}</h3>
+
+                                    {(() => {
+                                        const estadoVencimiento = getDeadlineState(task.deadline, task.status)
+                                        if (!estadoVencimiento || !task.deadline) return null
+                                        return (
+                                            <Badge variant="outline" className={`gap-1 text-xs mb-2 ${getDeadlineColor(estadoVencimiento)}`}>
+                                                <AlertTriangle className="w-3 h-3" />
+                                                {getDeadlineLabel(task.deadline, estadoVencimiento)}
+                                            </Badge>
+                                        )
+                                    })()}
 
                                     {task.notes && (
                                         <p className="text-sm text-slate-500 mb-3 line-clamp-2">

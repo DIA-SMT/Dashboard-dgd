@@ -8,9 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ChevronDown, ChevronUp, ArrowLeft, User } from 'lucide-react'
+import { ChevronDown, ChevronUp, ArrowLeft, User, AlertTriangle } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import {
+    DEFAULT_TASK_STATUS,
+    isTerminalStatus,
+    getStatusColor,
+    getDeadlineState,
+    getDeadlineLabel,
+    getDeadlineColor,
+} from '@/lib/task-status'
 
 
 type TaskWithProject = Task & {
@@ -126,7 +134,7 @@ export function AssignmentsView() {
         const tableData = tasks.map(t => [
             t.project?.title || 'Sin Proyecto',
             t.title,
-            t.status || 'Sin empezar',
+            t.status || DEFAULT_TASK_STATUS,
             t.notes || '-'
         ])
 
@@ -143,24 +151,13 @@ export function AssignmentsView() {
         doc.save(`informe_tareas_${assigneeName.replace(/\s+/g, '_').toLowerCase()}.pdf`)
     }
 
-    const getStatusColor = (status: string | null) => {
-        switch (status) {
-            case 'Terminada':
-                return 'bg-green-100 text-green-800'
-            case 'En desarrollo':
-                return 'bg-blue-100 text-blue-800'
-            default:
-                return 'bg-slate-100 text-slate-600'
-        }
-    }
-
     if (loading) return <div className="p-8">Cargando asignaciones...</div>
 
     const filteredAssignees = assignees.map(assignee => {
         const filteredTasks = assignee.tasks.filter(task => {
             if (statusFilter === 'all') return true;
-            const status = task.status || 'Sin empezar';
-            if (statusFilter === 'Pendientes') return status === 'Sin empezar' || status === 'En desarrollo';
+            const status = task.status || DEFAULT_TASK_STATUS;
+            if (statusFilter === 'Pendientes') return !isTerminalStatus(status);
             return status === statusFilter;
         });
         return {
@@ -197,7 +194,9 @@ export function AssignmentsView() {
                                 <SelectItem value="Pendientes">Pendientes</SelectItem>
                                 <SelectItem value="Sin empezar">Sin empezar</SelectItem>
                                 <SelectItem value="En desarrollo">En desarrollo</SelectItem>
+                                <SelectItem value="Pausada">Pausadas</SelectItem>
                                 <SelectItem value="Terminada">Terminadas</SelectItem>
+                                <SelectItem value="Cancelada">Canceladas</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>
@@ -271,9 +270,19 @@ export function AssignmentsView() {
                                                                 )}
                                                             </div>
                                                             <Badge className={`${getStatusColor(task.status)} text-xs ml-2`}>
-                                                                {task.status || 'Sin empezar'}
+                                                                {task.status || DEFAULT_TASK_STATUS}
                                                             </Badge>
                                                         </div>
+                                                        {(() => {
+                                                            const estadoVencimiento = getDeadlineState(task.deadline, task.status)
+                                                            if (!estadoVencimiento || !task.deadline) return null
+                                                            return (
+                                                                <Badge variant="outline" className={`gap-1 text-xs mt-1 ${getDeadlineColor(estadoVencimiento)}`}>
+                                                                    <AlertTriangle className="w-3 h-3" />
+                                                                    {getDeadlineLabel(task.deadline, estadoVencimiento)}
+                                                                </Badge>
+                                                            )
+                                                        })()}
                                                         {task.notes && (
                                                             <p className="text-xs text-slate-600 mt-2 line-clamp-2">{task.notes}</p>
                                                         )}

@@ -13,8 +13,17 @@ import { TaskForm } from '@/components/task-form'
 import { TaskEditForm } from '@/components/task-edit-form'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskCompletionModal } from '@/components/task-completion-modal'
-import { ArrowLeft, Calendar, CheckCircle2, Circle, Clock, Pencil, Check, X, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, CheckCircle2, Circle, Clock, PauseCircle, Ban, AlertTriangle, Pencil, Check, X, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import {
+    TASK_STATUSES,
+    DEFAULT_TASK_STATUS,
+    computeProgress,
+    getStatusColor,
+    getDeadlineState,
+    getDeadlineLabel,
+    getDeadlineColor,
+} from '@/lib/task-status'
 
 type TaskWithAssignees = Task & {
     assignees: TaskAssignee[]
@@ -88,7 +97,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     }, [fetchProjectData])
 
     const completedTasks = tasks.filter(t => t.status === 'Terminada').length
-    const progress = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0
+    const progress = computeProgress(tasks)
 
     const getStatusIcon = (status: string | null) => {
         switch (status) {
@@ -96,6 +105,10 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                 return <CheckCircle2 className="w-5 h-5 text-green-600" />
             case 'En desarrollo':
                 return <Clock className="w-5 h-5 text-blue-600" />
+            case 'Pausada':
+                return <PauseCircle className="w-5 h-5 text-amber-600" />
+            case 'Cancelada':
+                return <Ban className="w-5 h-5 text-rose-500" />
             default:
                 return <Circle className="w-5 h-5 text-slate-400" />
         }
@@ -163,17 +176,6 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
             alert('No se pudo actualizar la fecha límite del proyecto')
             // Rollback
             setProject({ ...project, deadline: oldDeadline })
-        }
-    }
-
-    const getStatusColor = (status: string | null) => {
-        switch (status) {
-            case 'Terminada':
-                return 'bg-green-100 text-green-800'
-            case 'En desarrollo':
-                return 'bg-blue-100 text-blue-800'
-            default:
-                return 'bg-slate-100 text-slate-600'
         }
     }
 
@@ -462,7 +464,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                                 <div className="flex gap-2 items-center w-full md:w-auto">
                                                     <Select
                                                         disabled={!!project.completed_at}
-                                                        value={task.status || 'Sin empezar'}
+                                                        value={task.status || DEFAULT_TASK_STATUS}
                                                         onValueChange={async (newStatus) => {
                                                             if (newStatus === 'Terminada') {
                                                                 setActiveTaskForCompletion(task)
@@ -497,9 +499,9 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                                             <SelectValue />
                                                         </SelectTrigger>
                                                         <SelectContent>
-                                                            <SelectItem value="Sin empezar">Sin empezar</SelectItem>
-                                                            <SelectItem value="En desarrollo">En desarrollo</SelectItem>
-                                                            <SelectItem value="Terminada">Terminada</SelectItem>
+                                                            {TASK_STATUSES.map((estado) => (
+                                                                <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                                                            ))}
                                                         </SelectContent>
                                                     </Select>
 
@@ -523,12 +525,21 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                                 </div>
                                             )}
 
-                                            {task.deadline && (
-                                                <div className="flex items-center gap-1.5 text-sm text-slate-600 mb-2">
-                                                    <Calendar className="w-4 h-4" />
-                                                    <span>Vence: {new Date(task.deadline + 'T00:00:00').toLocaleDateString()}</span>
-                                                </div>
-                                            )}
+                                            {task.deadline && (() => {
+                                                const estadoVencimiento = getDeadlineState(task.deadline, task.status)
+                                                return (
+                                                    <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 mb-2">
+                                                        <Calendar className="w-4 h-4" />
+                                                        <span>Vence: {new Date(task.deadline + 'T00:00:00').toLocaleDateString()}</span>
+                                                        {estadoVencimiento && (
+                                                            <Badge variant="outline" className={`gap-1 ${getDeadlineColor(estadoVencimiento)}`}>
+                                                                <AlertTriangle className="w-3 h-3" />
+                                                                {getDeadlineLabel(task.deadline!, estadoVencimiento)}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                )
+                                            })()}
 
                                             {task.notes && (
                                                 <p className="text-sm text-slate-600 mb-2">{task.notes}</p>

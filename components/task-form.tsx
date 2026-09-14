@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
+import { TASK_STATUSES, DEFAULT_TASK_STATUS, type TaskStatus } from '@/lib/task-status'
 
 export function TaskForm({
     onTaskCreated,
@@ -30,7 +31,7 @@ export function TaskForm({
     const [formData, setFormData] = useState({
         project_id: projectId || '',
         title: '',
-        status: 'Sin empezar',
+        status: DEFAULT_TASK_STATUS,
         deadline: '',
         notes: '',
         link: ''
@@ -179,7 +180,7 @@ export function TaskForm({
             setFormData({
                 project_id: projectId || '',
                 title: '',
-                status: 'Sin empezar',
+                status: DEFAULT_TASK_STATUS,
                 deadline: '',
                 notes: '',
                 link: ''
@@ -241,15 +242,15 @@ export function TaskForm({
                         <Label htmlFor="status">Estado</Label>
                         <Select
                             value={formData.status}
-                            onValueChange={(val) => setFormData({ ...formData, status: val })}
+                            onValueChange={(val) => setFormData({ ...formData, status: val as TaskStatus })}
                         >
                             <SelectTrigger>
                                 <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Sin empezar">Sin empezar</SelectItem>
-                                <SelectItem value="En desarrollo">En desarrollo</SelectItem>
-                                <SelectItem value="Terminada">Terminada</SelectItem>
+                                {TASK_STATUSES.map((estado) => (
+                                    <SelectItem key={estado} value={estado}>{estado}</SelectItem>
+                                ))}
                             </SelectContent>
                         </Select>
                     </div>
