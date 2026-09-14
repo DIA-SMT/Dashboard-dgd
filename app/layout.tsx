@@ -18,11 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Dashboard Comunicación",
-  description: "Gestion de Pedidos",
-  icons: {
-    icon: "/logoMuni-sm.png",
-  },
+  title: "Dashboard Dulci",
+  description: "Gestión de proyectos y pedidos",
 };
 
 export default function RootLayout({

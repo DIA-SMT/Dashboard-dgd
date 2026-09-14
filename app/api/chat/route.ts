@@ -362,7 +362,7 @@ export async function POST(req: Request) {
                     if (steps.length >= 6) return true
                     return last.finishReason !== 'tool-calls'
                 },
-                system: `Eres un asistente del sistema de gestión de proyectos "Comunicación".
+                system: `Eres un asistente del sistema de gestión de proyectos "Dashboard Dulci".
 Tienes acceso a datos de la BD mediante herramientas (projects, tasks, members).
 Antes de decir "no sé", consulta la BD con las herramientas.
 Si el usuario pregunta por tareas de un miembro y no especifica el id, primero usa get_members para encontrarlo por nombre/email y luego usa get_tasks con member_id o assignee_name.
