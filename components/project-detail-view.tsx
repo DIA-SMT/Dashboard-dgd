@@ -10,9 +10,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { TaskForm } from '@/components/task-form'
 import { TaskCard, type TaskWithAssignees } from '@/components/task-card'
+import { ActivityLogView } from '@/components/activity-log-view'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskCompletionModal } from '@/components/task-completion-modal'
-import { ArrowLeft, Calendar, CalendarPlus, CheckCircle2, Pencil, Check, X, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, CalendarPlus, CheckCircle2, History, ChevronDown, Pencil, Check, X, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { computeProgress, getStatusColor } from '@/lib/task-status'
@@ -107,6 +108,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [editedTitle, setEditedTitle] = useState('')
     const [isEditingDeadline, setIsEditingDeadline] = useState(false)
     const [editedDeadline, setEditedDeadline] = useState('')
+    const [verHistorial, setVerHistorial] = useState(false)
     const [isEditingStartDate, setIsEditingStartDate] = useState(false)
     const [editedStartDate, setEditedStartDate] = useState('')
 
@@ -622,6 +624,29 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                         ))}
                     </div>
                 )}
+
+                {/* R13: historial de modificaciones. Los registros los escriben los
+                    triggers de activity_log, así que esto es sólo lectura. */}
+                <section className="mt-8">
+                    <button
+                        onClick={() => setVerHistorial(!verHistorial)}
+                        aria-expanded={verHistorial}
+                        className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition-colors hover:bg-slate-50"
+                    >
+                        <History className="h-4 w-4 text-slate-500" />
+                        <span className="text-sm font-semibold text-slate-700">Historial de modificaciones</span>
+                        <ChevronDown className={`ml-auto h-4 w-4 text-slate-400 transition-transform ${verHistorial ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {verHistorial && (
+                        <div className="rounded-b-lg border border-t-0 border-slate-200 bg-white px-4 pb-2">
+                            <ActivityLogView
+                                projectId={projectId}
+                                tareas={Object.fromEntries(tasks.map(t => [t.id, t.title]))}
+                            />
+                        </div>
+                    )}
+                </section>
 
                 {/* Completion Modal */}
                 {showCompletionModal && (

@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { Button } from '@/components/ui/button'
 import { UserTasksPanel } from '@/components/user-tasks-panel'
-import { LogOut, User as UserIcon, Moon, Sun, ClipboardList, Settings } from 'lucide-react'
+import { LogOut, User as UserIcon, Moon, Sun, ClipboardList, Settings, BarChart3 } from 'lucide-react'
 
 import Link from 'next/link'
 
@@ -87,6 +87,13 @@ export function Navbar() {
                                     <ClipboardList className="h-4 w-4 mr-2" />
                                     Mis Tareas
                                 </Button>
+                                <Link
+                                    href="/indicadores"
+                                    className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                                >
+                                    <BarChart3 className="h-4 w-4" />
+                                    Indicadores
+                                </Link>
                                 {role === 'admin' && (
                                     <Link
                                         href="/configuracion"
@@ -150,6 +157,14 @@ export function Navbar() {
                                     >
                                         <UserIcon className="h-4 w-4" />
                                         <span className="text-sm font-medium">{user.email}</span>
+                                    </Link>
+                                    <Link
+                                        href="/indicadores"
+                                        className="flex items-center gap-2 p-2 text-white transition-colors hover:text-white/80"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
+                                        <BarChart3 className="h-4 w-4" />
+                                        <span className="text-sm font-medium">Indicadores</span>
                                     </Link>
                                     {role === 'admin' && (
                                         <Link
