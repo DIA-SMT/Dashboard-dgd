@@ -14,11 +14,19 @@ export default function ConfiguracionPage() {
     // Guarda del lado del cliente. La de verdad está en la API: cada endpoint
     // de /api/admin verifica el rol contra la base, así que entrar a esta URL
     // sin ser admin no alcanza para hacer nada.
+    //
+    // El `role === null` no es cosmético: en una carga directa de esta URL,
+    // AuthContext apaga `loading` desde el listener de onAuthStateChange antes
+    // de que la consulta del perfil haya devuelto el rol. Sin esta guarda, un
+    // admin que entra por favorito o refresca la página se expulsa a sí mismo.
+    // Que haya sesión ya lo garantizó el middleware, así que esperar a que el
+    // rol resuelva no deja a nadie colgado.
     useEffect(() => {
-        if (!loading && role !== 'admin') router.replace('/')
+        if (loading || role === null) return
+        if (role !== 'admin') router.replace('/')
     }, [loading, role, router])
 
-    if (loading || role !== 'admin') {
+    if (loading || role === null || role !== 'admin') {
         return (
             <div className="flex min-h-[60vh] items-center justify-center">
                 <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
