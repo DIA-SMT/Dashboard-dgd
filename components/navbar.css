@@ -1,0 +1,43 @@
+.navbar {
+    background-color: #0065ff; /* color pedido por ellos */
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 80px;
+}
+
+.navbar-logo {
+    display: flex;
+    align-items: flex-start;
+    padding: 10px 0;
+}
+
+.logo-muni {
+    height: 60px !important;
+    width: auto !important;
+    object-fit: contain;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .navbar-container {
+        padding: 0 0.75rem;
+    }
+
+    .logo-muni {
+        height: 60px !important;
+    }
+}
