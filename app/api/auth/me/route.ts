@@ -33,7 +33,7 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role')
+    .select('role, must_change_password')
     .eq('id', data.user.id)
     .eq('habilita', 1)
     .maybeSingle()
@@ -45,6 +45,7 @@ export async function GET() {
         email: data.user.email,
       },
       role: (profile?.role as 'admin' | 'common' | null) ?? 'common',
+      must_change_password: profile?.must_change_password ?? false,
     },
     { status: 200 }
   )

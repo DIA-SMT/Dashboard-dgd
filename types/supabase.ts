@@ -44,6 +44,7 @@ export type Database = {
                     role: string | null
                     avatar_url: string | null
                     habilita: number
+                    must_change_password: boolean
                 }
                 Insert: {
                     id: string
@@ -52,6 +53,7 @@ export type Database = {
                     role?: string | null
                     avatar_url?: string | null
                     habilita?: number
+                    must_change_password?: boolean
                 }
                 Update: {
                     id?: string
@@ -60,6 +62,7 @@ export type Database = {
                     role?: string | null
                     avatar_url?: string | null
                     habilita?: number
+                    must_change_password?: boolean
                 }
                 Relationships: []
             }
@@ -78,6 +81,11 @@ export type Database = {
                     type: string | null
                     upload_link: string | null
                     habilita: number
+                    start_date: string | null
+                    objectives: string | null
+                    scope: string | null
+                    progress: number | null
+                    owner_id: string | null
                 }
                 Insert: {
                     area?: string | null
@@ -93,6 +101,11 @@ export type Database = {
                     type?: string | null
                     upload_link?: string | null
                     habilita?: number
+                    start_date?: string | null
+                    objectives?: string | null
+                    scope?: string | null
+                    progress?: number | null
+                    owner_id?: string | null
                 }
                 Update: {
                     area?: string | null
@@ -108,6 +121,11 @@ export type Database = {
                     type?: string | null
                     upload_link?: string | null
                     habilita?: number
+                    start_date?: string | null
+                    objectives?: string | null
+                    scope?: string | null
+                    progress?: number | null
+                    owner_id?: string | null
                 }
                 Relationships: []
             }
@@ -159,6 +177,7 @@ export type Database = {
                     full_name: string
                     id: string
                     habilita: number
+                    user_id: string | null
                 }
                 Insert: {
                     created_at?: string | null
@@ -166,6 +185,7 @@ export type Database = {
                     full_name: string
                     id?: string
                     habilita?: number
+                    user_id?: string | null
                 }
                 Update: {
                     created_at?: string | null
@@ -173,6 +193,7 @@ export type Database = {
                     full_name?: string
                     id?: string
                     habilita?: number
+                    user_id?: string | null
                 }
                 Relationships: []
             }
@@ -187,6 +208,8 @@ export type Database = {
                     status: string | null
                     title: string
                     habilita: number
+                    parent_task_id: string | null
+                    completed_at: string | null
                 }
                 Insert: {
                     created_at?: string | null
@@ -198,6 +221,8 @@ export type Database = {
                     status?: string | null
                     title: string
                     habilita?: number
+                    parent_task_id?: string | null
+                    completed_at?: string | null
                 }
                 Update: {
                     created_at?: string | null
@@ -209,6 +234,8 @@ export type Database = {
                     status?: string | null
                     title?: string
                     habilita?: number
+                    parent_task_id?: string | null
+                    completed_at?: string | null
                 }
                 Relationships: [
                     {
@@ -219,6 +246,80 @@ export type Database = {
                         referencedColumns: ["id"]
                     }
                 ]
+            }
+            task_comments: {
+                Row: {
+                    id: string
+                    task_id: string
+                    author_id: string | null
+                    author_name: string | null
+                    content: string
+                    created_at: string | null
+                    habilita: number
+                }
+                Insert: {
+                    id?: string
+                    task_id: string
+                    author_id?: string | null
+                    author_name?: string | null
+                    content: string
+                    created_at?: string | null
+                    habilita?: number
+                }
+                Update: {
+                    id?: string
+                    task_id?: string
+                    author_id?: string | null
+                    author_name?: string | null
+                    content?: string
+                    created_at?: string | null
+                    habilita?: number
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "task_comments_task_id_fkey"
+                        columns: ["task_id"]
+                        isOneToOne: false
+                        referencedRelation: "tasks"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
+            activity_log: {
+                Row: {
+                    id: number
+                    entity_type: string
+                    entity_id: string
+                    action: string
+                    field: string | null
+                    old_value: string | null
+                    new_value: string | null
+                    changed_by: string | null
+                    changed_at: string | null
+                }
+                Insert: {
+                    id?: number
+                    entity_type: string
+                    entity_id: string
+                    action: string
+                    field?: string | null
+                    old_value?: string | null
+                    new_value?: string | null
+                    changed_by?: string | null
+                    changed_at?: string | null
+                }
+                Update: {
+                    id?: number
+                    entity_type?: string
+                    entity_id?: string
+                    action?: string
+                    field?: string | null
+                    old_value?: string | null
+                    new_value?: string | null
+                    changed_by?: string | null
+                    changed_at?: string | null
+                }
+                Relationships: []
             }
         }
         Views: {

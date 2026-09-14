@@ -8,22 +8,29 @@ type AuthContextType = {
     user: User | null
     session: Session | null
     role: 'admin' | 'common' | null
+    /** El usuario tiene una contraseña provisoria y debe cambiarla para seguir. */
+    mustChangePassword: boolean
     loading: boolean
     signOut: () => Promise<void>
+    /** Vuelve a leer el perfil. Se usa al terminar de cambiar la contraseña. */
+    refreshProfile: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
     session: null,
     role: null,
+    mustChangePassword: false,
     loading: true,
-    signOut: async () => { }
+    signOut: async () => { },
+    refreshProfile: async () => { }
 })
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<User | null>(null)
     const [session, setSession] = useState<Session | null>(null)
     const [role, setRole] = useState<'admin' | 'common' | null>(null)
+    const [mustChangePassword, setMustChangePassword] = useState(false)
     const [loading, setLoading] = useState(true)
 
     const lastUserId = useRef<string | null>(null)
@@ -49,7 +56,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                     lastUserId.current = currentSession.user.id
                     const { data: profile } = await supabase
                         .from('profiles')
-                        .select('role')
+                        .select('role, must_change_password')
                         .eq('id', currentSession.user.id)
                         .eq('habilita', 1)
                         .maybeSingle()
@@ -64,9 +71,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         lastUserId.current = null
                     } else {
                         setRole((profile.role as 'admin' | 'common') || 'common')
+                        setMustChangePassword(!!profile.must_change_password)
                     }
                 } else {
                     setRole(null)
+                    setMustChangePassword(false)
                     lastUserId.current = null
                 }
 
@@ -87,6 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         const payload = await res.json()
                         // payload.user puede ser minimal; mantenemos el user de sesión local si existe.
                         setRole(payload.role ?? 'common')
+                        setMustChangePassword(!!payload.must_change_password)
                         if (!currentSession?.user && payload.user) {
                             // fallback mínimo para UI (Navbar usa email)
                             setUser({ ...(payload.user ?? {}) } as any)
@@ -141,7 +151,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                         lastUserId.current = newSession.user.id
                         const { data: profile } = await supabase
                             .from('profiles')
-                            .select('role')
+                            .select('role, must_change_password')
                             .eq('id', newSession.user.id)
                             .eq('habilita', 1)
                             .maybeSingle()
@@ -155,6 +165,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                             lastUserId.current = null
                         } else {
                             setRole((profile.role as 'admin' | 'common') || 'common')
+                            setMustChangePassword(!!profile.must_change_password)
                         }
                     } else {
                         lastUserId.current = null
@@ -192,10 +203,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(null)
         setSession(null)
         setRole(null)
+        setMustChangePassword(false)
+    }
+
+    const refreshProfile = async () => {
+        const { data: { user: actual } } = await supabase.auth.getUser()
+        if (!actual) return
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, must_change_password')
+            .eq('id', actual.id)
+            .maybeSingle()
+        if (profile) {
+            setRole((profile.role as 'admin' | 'common') || 'common')
+            setMustChangePassword(!!profile.must_change_password)
+        }
     }
 
     return (
-        <AuthContext.Provider value={{ user, session, role, loading, signOut }}>
+        <AuthContext.Provider value={{ user, session, role, mustChangePassword, loading, signOut, refreshProfile }}>
             {children}
         </AuthContext.Provider>
     )

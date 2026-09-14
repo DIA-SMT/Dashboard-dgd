@@ -56,18 +56,44 @@ export async function updateSession(request: NextRequest) {
         return supabaseResponse
     }
 
-    if (
-        !user &&
-        !request.nextUrl.pathname.startsWith('/api') &&
-        !request.nextUrl.pathname.startsWith('/login') &&
-        !request.nextUrl.pathname.startsWith('/auth') &&
-        !request.nextUrl.pathname.startsWith('/forgot-password') &&
-        !request.nextUrl.pathname.startsWith('/reset-password')
-    ) {
-        // no user, potentially respond by redirecting the user to the login page
+    const path = request.nextUrl.pathname
+
+    // Rutas que tienen que seguir siendo alcanzables sin sesión, o mientras la
+    // sesión está a medio resolver.
+    const esRutaPublica =
+        path.startsWith('/api') ||
+        path.startsWith('/login') ||
+        path.startsWith('/auth') ||
+        path.startsWith('/forgot-password') ||
+        path.startsWith('/reset-password')
+
+    if (!user && !esRutaPublica) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/login'
         return NextResponse.redirect(redirectUrl)
+    }
+
+    // Contraseña provisoria: hasta que no elija una nueva, no entra a ningún
+    // lado. Se controla acá y no sólo en el cliente porque en el cliente
+    // alcanza con escribir otra URL para saltearlo.
+    if (user && !esRutaPublica && path !== '/cambiar-password') {
+        try {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('must_change_password')
+                .eq('id', user.id)
+                .maybeSingle()
+
+            if (profile?.must_change_password) {
+                const redirectUrl = request.nextUrl.clone()
+                redirectUrl.pathname = '/cambiar-password'
+                redirectUrl.search = ''
+                return NextResponse.redirect(redirectUrl)
+            }
+        } catch {
+            // Si la consulta falla no bloqueamos la navegación: el guard del
+            // cliente sigue en pie y es preferible a dejar la app inaccesible.
+        }
     }
 
     return supabaseResponse

@@ -32,7 +32,7 @@ export default function MembersPage() {
     const [loading, setLoading] = useState(true)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [editingMember, setEditingMember] = useState<Member | null>(null)
-    const [formData, setFormData] = useState({ full_name: '', email: '', password: '' })
+    const [formData, setFormData] = useState({ full_name: '', email: '' })
     const [saveLoading, setSaveLoading] = useState(false)
     const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
@@ -73,21 +73,14 @@ export default function MembersPage() {
 
                 if (error) throw error
             } else {
-                // Call Admin API to create user
-                const response = await fetch('/api/admin/create-user', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        email: formData.email,
-                        password: formData.password,
-                        full_name: formData.full_name
+                const { error } = await supabase
+                    .from('members')
+                    .insert({
+                        full_name: formData.full_name,
+                        email: formData.email || null,
                     })
-                })
 
-                if (!response.ok) {
-                    const errorData = await response.json()
-                    throw new Error(errorData.error || 'Error creando usuario')
-                }
+                if (error) throw error
             }
 
             setIsDialogOpen(false)
@@ -126,7 +119,7 @@ export default function MembersPage() {
 
     function resetForm() {
         setEditingMember(null)
-        setFormData({ full_name: '', email: '', password: '' })
+        setFormData({ full_name: '', email: '' })
     }
 
     function openEditDialog(member: Member) {
@@ -134,7 +127,6 @@ export default function MembersPage() {
         setFormData({
             full_name: member.full_name,
             email: member.email || '',
-            password: ''
         })
         setIsDialogOpen(true)
     }
@@ -150,7 +142,12 @@ export default function MembersPage() {
                 Volver a proyectos
             </Button>
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold">Miembros del Equipo</h1>
+                <div>
+                    <h1 className="text-2xl font-bold">Miembros del Equipo</h1>
+                    <p className="text-sm text-slate-500">
+                        Las personas a las que se les pueden asignar tareas.
+                    </p>
+                </div>
                 <Dialog open={isDialogOpen} onOpenChange={(open) => {
                     setIsDialogOpen(open)
                     if (!open) resetForm()
@@ -188,16 +185,12 @@ export default function MembersPage() {
                                 />
                             </div>
                             {!editingMember && (
-                                <div className="space-y-2">
-                                    <Label htmlFor="password">Contraseña</Label>
-                                    <Input
-                                        id="password"
-                                        type="password"
-                                        value={formData.password}
-                                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                        required
-                                    />
-                                </div>
+                                <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+                                    Esto suma a la persona a la nómina de asignables, sin crearle
+                                    usuario. Para que además pueda iniciar sesión, dala de alta
+                                    desde <strong>Configuración</strong>: al crear el usuario queda
+                                    agregada acá automáticamente.
+                                </p>
                             )}
                             <Button type="submit" className="w-full" disabled={saveLoading}>
                                 {saveLoading ? 'Guardando...' : 'Guardar'}

@@ -8,12 +8,12 @@ import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { Button } from '@/components/ui/button'
 import { UserTasksPanel } from '@/components/user-tasks-panel'
-import { LogOut, User as UserIcon, Moon, Sun, ClipboardList } from 'lucide-react'
+import { LogOut, User as UserIcon, Moon, Sun, ClipboardList, Settings } from 'lucide-react'
 
 import Link from 'next/link'
 
 export function Navbar() {
-    const { user, signOut } = useAuth()
+    const { user, role, signOut } = useAuth()
     const { theme, toggleTheme } = useTheme()
     const router = useRouter()
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -80,6 +80,15 @@ export function Navbar() {
                                     <ClipboardList className="h-4 w-4 mr-2" />
                                     Mis Tareas
                                 </Button>
+                                {role === 'admin' && (
+                                    <Link
+                                        href="/configuracion"
+                                        className="flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                                    >
+                                        <Settings className="h-4 w-4" />
+                                        Configuración
+                                    </Link>
+                                )}
                                 <Link href="/profile" className="flex items-center gap-2 text-white hover:text-white/80 transition-colors">
                                     <UserIcon className="h-4 w-4" />
                                     <span className="text-sm font-medium">{user.email}</span>
@@ -135,6 +144,16 @@ export function Navbar() {
                                         <UserIcon className="h-4 w-4" />
                                         <span className="text-sm font-medium">{user.email}</span>
                                     </Link>
+                                    {role === 'admin' && (
+                                        <Link
+                                            href="/configuracion"
+                                            className="flex items-center gap-2 p-2 text-white transition-colors hover:text-white/80"
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                        >
+                                            <Settings className="h-4 w-4" />
+                                            <span className="text-sm font-medium">Configuración</span>
+                                        </Link>
+                                    )}
                                     <Button
                                         variant="secondary"
                                         size="sm"

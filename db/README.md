@@ -11,12 +11,15 @@ En el **SQL Editor** del proyecto Supabase, cada archivo completo y de una sola 
 2. **`02_pedido.sql`** — agrega lo que pide el expediente y todavía no existe:
    fecha de inicio, objetivos y alcance, avance manual, responsable de proyecto,
    subtareas, comentarios e historial de cambios. Es puramente aditivo.
+3. **`03_configuracion.sql`** — gestión de usuarios: la marca de contraseña
+   provisoria (`profiles.must_change_password`) y el vínculo entre la nómina y
+   las cuentas que inician sesión (`members.user_id`). También aditivo.
 
 Al final de `01_base.sql` está la consulta para convertirte en admin. Correla
 **después** de registrarte por la app: sin rol `admin` no vas a poder crear
 proyectos ni tareas.
 
-Los dos archivos son idempotentes, así que se pueden volver a correr sin romper nada.
+Los tres archivos son idempotentes, así que se pueden volver a correr sin romper nada.
 
 ## `legacy/`
 
