@@ -41,3 +41,66 @@
         height: 60px !important;
     }
 }
+/* Membrete: logo del municipio | dependencia, como en el papel oficial. */
+.navbar-logo {
+    gap: 0.9rem;
+    align-items: center;
+}
+
+.navbar-divisor {
+    width: 1px;
+    height: 42px;
+    background-color: rgba(255, 255, 255, 0.45);
+    flex-shrink: 0;
+}
+
+.navbar-dependencia {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: #fff;
+    line-height: 1.15;
+    /* El nombre no debe competir con el logo: mismo peso visual, menor tamaño. */
+    letter-spacing: 0.01em;
+}
+
+.navbar-dependencia-linea1 {
+    font-size: 0.72rem;
+    font-weight: 400;
+    opacity: 0.85;
+}
+
+.navbar-dependencia-linea2 {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+/* En pantallas chicas el reloj ya está oculto; la dependencia se achica para
+   no empujar los botones de la derecha. */
+@media (max-width: 640px) {
+    .navbar-divisor {
+        height: 32px;
+    }
+
+    .navbar-dependencia-linea1 {
+        font-size: 0.62rem;
+    }
+
+    .navbar-dependencia-linea2 {
+        font-size: 0.82rem;
+    }
+}
+
+/* El reloj está centrado en absoluto y a partir de 768px se le encima al
+   membrete: a ese ancho el logo llega a 328px y el reloj arranca en 282.
+   Debajo de 768px el reloj no se muestra, y a partir de 1024px hay lugar
+   para los dos. La franja del medio es la única que hay que resolver, y el
+   nombre de la dependencia es lo que cede: el reloj es información que
+   cambia, el membrete es fijo y ya está el logo identificando al municipio. */
+@media (min-width: 768px) and (max-width: 1023px) {
+
+    .navbar-divisor,
+    .navbar-dependencia {
+        display: none;
+    }
+}

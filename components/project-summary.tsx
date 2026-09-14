@@ -1,17 +1,59 @@
 'use client'
 
 import { Card, CardContent } from "@/components/ui/card"
+import { FolderKanban, AlertTriangle, CalendarClock, ClipboardCheck, CheckCircle2 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { Project } from "@/types"
+
+type Filtro = 'active' | 'urgent' | 'due_soon' | 'completed' | 'ready'
 
 interface ProjectSummaryProps {
     projects: Project[]
-    currentFilter: 'active' | 'urgent' | 'due_soon' | 'completed' | 'ready'
-    onFilterChange: (filter: 'active' | 'urgent' | 'due_soon' | 'completed' | 'ready') => void
+    currentFilter: Filtro
+    onFilterChange: (filter: Filtro) => void
     projectProgress: Record<string, number>
 }
 
+/**
+ * Un indicador del encabezado.
+ *
+ * Antes cada uno repetía el mismo bloque con un emoji distinto. El ícono
+ * ahora es un trazo monocromo sobre un fondo tenue del mismo tono: se lee
+ * igual de rápido, pero no desentona con un tablero institucional.
+ */
+function Indicador({ icono: Icono, etiqueta, valor, tono, activo, onClick }: {
+    icono: LucideIcon
+    etiqueta: string
+    valor: number
+    tono: string
+    activo: boolean
+    onClick: () => void
+}) {
+    return (
+        <button
+            onClick={onClick}
+            aria-pressed={activo}
+            className={`flex w-full flex-1 items-center gap-3 px-4 py-3 text-left transition-colors ${
+                activo ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'hover:bg-slate-50/70'
+            }`}
+        >
+            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${tono}`}>
+                <Icono className="h-[18px] w-[18px]" strokeWidth={1.75} />
+            </span>
+            <span className="min-w-0">
+                <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    {etiqueta}
+                </span>
+                <span className="block text-xl font-semibold leading-tight text-slate-900 tabular-nums">
+                    {valor}
+                </span>
+            </span>
+        </button>
+    )
+}
+
+
 export function ProjectSummary({ projects, currentFilter, onFilterChange, projectProgress }: ProjectSummaryProps) {
-    const totalProjects = projects.length
 
     // Active: Not completed AND progress < 100
     const activeProjects = projects.filter(p => !p.completed_at && (projectProgress[p.id] || 0) < 100).length
@@ -49,68 +91,29 @@ export function ProjectSummary({ projects, currentFilter, onFilterChange, projec
         return deadline >= monday && deadline <= sunday
     }).length
 
-    const getActiveStyle = (filter: string) => {
-        return currentFilter === filter ? 'bg-slate-100 ring-2 ring-inset ring-slate-200' : 'hover:bg-slate-50'
-    }
+    const indicadores: { filtro: Filtro; icono: LucideIcon; etiqueta: string; valor: number; tono: string }[] = [
+        { filtro: 'active', icono: FolderKanban, etiqueta: 'Activos', valor: activeProjects, tono: 'bg-blue-50 text-blue-700' },
+        { filtro: 'urgent', icono: AlertTriangle, etiqueta: 'Urgentes', valor: urgentProjects, tono: 'bg-red-50 text-red-700' },
+        { filtro: 'due_soon', icono: CalendarClock, etiqueta: 'Vencen esta semana', valor: dueSoonProjects, tono: 'bg-amber-50 text-amber-700' },
+        { filtro: 'ready', icono: ClipboardCheck, etiqueta: 'Para aprobación', valor: readyProjects, tono: 'bg-violet-50 text-violet-700' },
+        { filtro: 'completed', icono: CheckCircle2, etiqueta: 'Finalizados', valor: completedProjects, tono: 'bg-emerald-50 text-emerald-700' },
+    ]
 
     return (
-        <Card className="bg-white shadow-md border-slate-200 mb-6 overflow-hidden">
+        <Card className="mb-6 overflow-hidden border-slate-200 bg-white shadow-sm">
             <CardContent className="p-0">
-                <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-100 text-left">
-                    <button
-                        onClick={() => onFilterChange('active')}
-                        className={`flex-1 flex items-center py-2 px-4 transition-all cursor-pointer text-left w-full ${getActiveStyle('active')}`}
-                    >
-                        <span className="text-2xl mr-3 shrink-0">🤪</span>
-                        <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0">Activos</p>
-                            <h3 className="text-lg font-bold text-slate-800 leading-none">{activeProjects}</h3>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={() => onFilterChange('urgent')}
-                        className={`flex-1 flex items-center py-2 px-4 transition-all cursor-pointer text-left w-full ${getActiveStyle('urgent')}`}
-                    >
-                        <span className="text-2xl mr-3 shrink-0">🔥</span>
-                        <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0">Urgente</p>
-                            <h3 className="text-lg font-bold text-slate-800 leading-none">{urgentProjects}</h3>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={() => onFilterChange('due_soon')}
-                        className={`flex-1 flex items-center py-2 px-4 transition-all cursor-pointer text-left w-full ${getActiveStyle('due_soon')}`}
-                    >
-                        <span className="text-2xl mr-3 shrink-0">⏰</span>
-                        <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0">Vencen esta semana</p>
-                            <h3 className="text-lg font-bold text-slate-800 leading-none">{dueSoonProjects}</h3>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={() => onFilterChange('ready')}
-                        className={`flex-1 flex items-center py-2 px-4 transition-all cursor-pointer text-left w-full ${getActiveStyle('ready')}`}
-                    >
-                        <span className="text-2xl mr-3 shrink-0">👀</span>
-                        <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0">Para aprobación</p>
-                            <h3 className="text-lg font-bold text-slate-800 leading-none">{readyProjects}</h3>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={() => onFilterChange('completed')}
-                        className={`flex-1 flex items-center py-2 px-4 transition-all cursor-pointer text-left w-full ${getActiveStyle('completed')}`}
-                    >
-                        <span className="text-2xl mr-3 shrink-0">😎</span>
-                        <div>
-                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 mb-0">Finalizados</p>
-                            <h3 className="text-lg font-bold text-slate-800 leading-none">{completedProjects}</h3>
-                        </div>
-                    </button>
+                <div className="flex flex-col divide-y divide-slate-100 md:flex-row md:divide-x md:divide-y-0">
+                    {indicadores.map((ind) => (
+                        <Indicador
+                            key={ind.filtro}
+                            icono={ind.icono}
+                            etiqueta={ind.etiqueta}
+                            valor={ind.valor}
+                            tono={ind.tono}
+                            activo={currentFilter === ind.filtro}
+                            onClick={() => onFilterChange(ind.filtro)}
+                        />
+                    ))}
                 </div>
             </CardContent>
         </Card>

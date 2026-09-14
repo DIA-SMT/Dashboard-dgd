@@ -65,6 +65,13 @@ export function Navbar() {
                             priority
                             unoptimized
                         />
+                        {/* Replica el membrete institucional: el logo del municipio y,
+                            separada por una barra, la dependencia. */}
+                        <span className="navbar-divisor" aria-hidden="true" />
+                        <span className="navbar-dependencia">
+                            <span className="navbar-dependencia-linea1">Dirección de</span>
+                            <span className="navbar-dependencia-linea2">Gerencia de Datos</span>
+                        </span>
                     </div>
 
                     {user && (

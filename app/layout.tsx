@@ -19,7 +19,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Dashboard Dulci",
-  description: "Gestión de proyectos y pedidos",
+  description: "Gestión de proyectos y tareas — Dirección de Gerencia de Datos, Municipalidad de San Miguel de Tucumán",
 };
 
 export default function RootLayout({

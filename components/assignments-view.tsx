@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ChevronDown, ChevronUp, ArrowLeft, User, AlertTriangle } from 'lucide-react'
+import { ChevronDown, ChevronUp, ArrowLeft, User, AlertTriangle, FileDown, FolderKanban } from 'lucide-react'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import {
@@ -247,7 +247,8 @@ export function AssignmentsView() {
                                                         generateReport(assignee.name, assignee.tasks)
                                                     }}
                                                 >
-                                                    📄 Descargar Informe
+                                                    <FileDown className="mr-2 h-4 w-4" />
+                                                        Descargar Informe
                                                 </Button>
                                             </div>
                                             <div className="space-y-3">
@@ -265,7 +266,7 @@ export function AssignmentsView() {
                                                                 <p className="font-semibold text-sm">{task.title}</p>
                                                                 {task.project && (
                                                                     <p className="text-xs text-slate-500 mt-1">
-                                                                        📁 {task.project.title}
+                                                                        <FolderKanban className="inline h-3 w-3 mr-1 -mt-0.5" />{task.project.title}
                                                                     </p>
                                                                 )}
                                                             </div>
