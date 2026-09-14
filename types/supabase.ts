@@ -9,33 +9,6 @@ export type Json =
 export type Database = {
     public: {
         Tables: {
-            daily_notes: {
-                Row: {
-                    id: string
-                    content: string
-                    done: boolean
-                    created_by: string
-                    created_at: string
-                    habilita: number
-                }
-                Insert: {
-                    id?: string
-                    content: string
-                    done?: boolean
-                    created_by: string
-                    created_at?: string
-                    habilita?: number
-                }
-                Update: {
-                    id?: string
-                    content?: string
-                    done?: boolean
-                    created_by?: string
-                    created_at?: string
-                    habilita?: number
-                }
-                Relationships: []
-            }
             profiles: {
                 Row: {
                     id: string

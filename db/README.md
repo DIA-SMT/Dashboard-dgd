@@ -5,7 +5,7 @@
 En el **SQL Editor** del proyecto Supabase, cada archivo completo y de una sola vez:
 
 1. **`01_base.sql`** — crea las 6 tablas que la app usa hoy (`profiles`, `members`,
-   `projects`, `tasks`, `task_assignees`, `daily_notes`), sus políticas RLS, el
+   `projects`, `tasks`, `task_assignees`), sus políticas RLS, el
    trigger que da de alta el perfil al registrarse y las suscripciones de Realtime.
    Sin esto la app no levanta.
 2. **`02_pedido.sql`** — agrega lo que pide el expediente y todavía no existe:

@@ -114,21 +114,6 @@ create index if not exists task_assignees_member_id_idx on public.task_assignees
 
 
 -- =============================================================================
--- 6. daily_notes — notas del día
--- =============================================================================
-create table if not exists public.daily_notes (
-  id           uuid primary key default gen_random_uuid(),
-  content      text not null,
-  done         boolean default false,
-  created_by   text not null,
-  member_id    uuid references public.members(id) on delete set null,
-  member_name  text,
-  created_at   timestamptz default now(),
-  habilita     integer default 1
-);
-
-
--- =============================================================================
 -- 7. Row Level Security
 -- =============================================================================
 alter table public.profiles       enable row level security;
@@ -136,7 +121,6 @@ alter table public.members        enable row level security;
 alter table public.projects       enable row level security;
 alter table public.tasks          enable row level security;
 alter table public.task_assignees enable row level security;
-alter table public.daily_notes    enable row level security;
 
 -- Helper: ¿el usuario actual es admin? Evita repetir el subselect en cada
 -- política y hace que se lea mucho mejor.
@@ -201,32 +185,15 @@ drop policy if exists "task_assignees_admin_all" on public.task_assignees;
 create policy "task_assignees_admin_all" on public.task_assignees
   for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
--- --- daily_notes ------------------------------------------------------------
--- Acá no hay restricción por rol: cualquier autenticado carga y edita notas.
-drop policy if exists "daily_notes_select" on public.daily_notes;
-create policy "daily_notes_select" on public.daily_notes
-  for select to authenticated using (habilita = 1);
-
-drop policy if exists "daily_notes_insert" on public.daily_notes;
-create policy "daily_notes_insert" on public.daily_notes
-  for insert to authenticated with check (true);
-
--- El with check (true) es a propósito: permite pasar habilita a 0 (borrado
--- lógico) sin que la política de lectura bloquee el update.
-drop policy if exists "daily_notes_update" on public.daily_notes;
-create policy "daily_notes_update" on public.daily_notes
-  for update to authenticated using (true) with check (true);
-
-
 -- =============================================================================
 -- 8. Realtime
 -- =============================================================================
--- La app se suscribe a cambios de estas tres tablas
--- (components/projects-list-view.tsx y components/daily-notes-panel.tsx).
+-- La app se suscribe a cambios de estas dos tablas
+-- (components/projects-list-view.tsx).
 do $$
 declare t text;
 begin
-  foreach t in array array['projects', 'tasks', 'daily_notes'] loop
+  foreach t in array array['projects', 'tasks'] loop
     if not exists (
       select 1
       from pg_publication_rel pr

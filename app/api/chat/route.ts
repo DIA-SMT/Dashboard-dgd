@@ -413,26 +413,6 @@ export async function POST(req: Request) {
                 return data
             },
         }),
-        get_daily_notes: tool({
-            description: 'Notas del día cargadas por el equipo (contenido, autor, si está hecha y fecha).',
-            inputSchema: jsonSchema({
-                type: 'object',
-                properties: {},
-                required: [],
-                additionalProperties: false,
-            }),
-            execute: async () => {
-                const { data, error } = await supabase
-                    .from('daily_notes')
-                    .select('content, done, created_by, member_name, created_at')
-                    .eq('habilita', 1)
-                    .order('created_at', { ascending: false })
-                    .limit(100)
-
-                if (error) throw new Error(error.message)
-                return data
-            },
-        }),
     } as const;
 
     let modelMessages
@@ -470,7 +450,7 @@ export async function POST(req: Request) {
                 },
                 system: `Eres un asistente del sistema de gestión de proyectos "Dashboard DGD".
 Tienes acceso a datos de la BD mediante herramientas: proyectos, tareas,
-miembros, comentarios de tareas, historial de cambios, usuarios y notas del día.
+miembros, comentarios de tareas, historial de cambios y usuarios.
 Antes de decir "no sé", consulta la BD con las herramientas.
 
 Sobre el modelo de datos:
