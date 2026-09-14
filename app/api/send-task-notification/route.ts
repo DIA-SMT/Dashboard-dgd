@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
+import { requireUsuarioHabilitado } from '@/lib/auth-admin'
 
 export async function POST(request: NextRequest) {
+    // Sin esto el endpoint queda abierto: cualquiera puede mandar correos desde
+    // la cuenta del municipio, con destinatario y contenido a su gusto. Los
+    // campos del cuerpo se interpolan en el mensaje, así que sirve de vector de
+    // phishing con remitente legítimo.
+    const sesion = await requireUsuarioHabilitado()
+    if (!sesion.ok) return sesion.response
+
     try {
         const body = await request.json()
         const { email, memberName, taskTitle, taskNotes, taskLink, projectTitle, notificationType = 'new' } = body

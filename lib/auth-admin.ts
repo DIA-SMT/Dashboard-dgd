@@ -44,6 +44,37 @@ export async function getRequestClient() {
     )
 }
 
+/**
+ * Exige una sesión válida de un usuario habilitado.
+ *
+ * No alcanza con que exista la sesión: a alguien dado de baja le queda el token
+ * vivo hasta que expire, y sin este control podría seguir usando los endpoints
+ * —incluido el del asistente, que cuesta plata— después de la baja.
+ */
+export async function requireUsuarioHabilitado(): Promise<
+    { ok: true; userId: string; email: string | undefined; role: string }
+    | { ok: false; response: NextResponse }
+> {
+    const supabase = await getRequestClient()
+
+    const { data: { user }, error } = await supabase.auth.getUser()
+    if (error || !user) {
+        return { ok: false, response: NextResponse.json({ error: 'No autenticado' }, { status: 401 }) }
+    }
+
+    const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role, habilita')
+        .eq('id', user.id)
+        .maybeSingle()
+
+    if (!profile || profile.habilita !== 1) {
+        return { ok: false, response: NextResponse.json({ error: 'Usuario deshabilitado' }, { status: 403 }) }
+    }
+
+    return { ok: true, userId: user.id, email: user.email, role: profile.role ?? 'common' }
+}
+
 export type AdminCheck =
     | { ok: true; userId: string; email: string | undefined }
     | { ok: false; response: NextResponse }

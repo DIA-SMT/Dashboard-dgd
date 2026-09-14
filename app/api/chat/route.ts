@@ -1,10 +1,14 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { convertToModelMessages, jsonSchema, streamText, tool } from 'ai';
 import { createServerClient } from '@supabase/ssr'
+import { consumir } from '@/lib/rate-limit'
 import { cookies } from 'next/headers'
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30;
+
+/** Tope por usuario y por hora del asistente. Ver lib/rate-limit.ts. */
+const CONSULTAS_POR_HORA = 40
 
 export async function POST(req: Request) {
     // OpenRouter (vía proveedor OpenAI compatible)
@@ -72,6 +76,30 @@ export async function POST(req: Request) {
 
     if (!user) {
         return Response.json({ error: 'No autenticado' }, { status: 401 })
+    }
+
+    // Este endpoint es el único que cuesta dinero por llamada, así que además de
+    // la sesión se comprueba que el usuario siga habilitado: a alguien dado de
+    // baja le queda el token vivo hasta que expire.
+    const { data: perfil } = await supabase
+        .from('profiles')
+        .select('habilita')
+        .eq('id', user.id)
+        .maybeSingle()
+
+    if (!perfil || perfil.habilita !== 1) {
+        return Response.json({ error: 'Usuario deshabilitado' }, { status: 403 })
+    }
+
+    const cupo = consumir(`chat:${user.id}`, CONSULTAS_POR_HORA, 60 * 60 * 1000)
+    if (!cupo.permitido) {
+        return Response.json(
+            {
+                error: `Alcanzaste el límite de ${CONSULTAS_POR_HORA} consultas por hora. ` +
+                    `Volvé a intentar en ${Math.ceil(cupo.esperarSegundos / 60)} minutos.`,
+            },
+            { status: 429 }
+        )
     }
 
     let body: any
