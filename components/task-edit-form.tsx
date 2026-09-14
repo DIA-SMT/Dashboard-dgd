@@ -195,7 +195,7 @@ export function TaskEditForm({
     }
 
     async function handleDelete() {
-        if (!confirm('¿Estás seguro de que quieres eliminar esta tarea?')) return
+        if (!confirm('¿Estás seguro de que quieres eliminar esta tarea? Si tiene subtareas, también se eliminan.')) return
 
         setDeleting(true)
         try {
@@ -205,6 +205,17 @@ export function TaskEditForm({
                 .eq('id', task.id)
 
             if (error) throw error
+
+            // El borrado es lógico, así que el ON DELETE CASCADE de la base no
+            // interviene: si no bajamos también las subtareas, quedan colgando
+            // de una madre que ya no se muestra y desaparecen de la vista sin
+            // estar dadas de baja.
+            const { error: errorSubtareas } = await supabase
+                .from('tasks')
+                .update({ habilita: 0 })
+                .eq('parent_task_id', task.id)
+
+            if (errorSubtareas) throw errorSubtareas
 
             setOpen(false)
             onTaskDeleted()

@@ -11,15 +11,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { X } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 import { TASK_STATUSES, DEFAULT_TASK_STATUS, type TaskStatus } from '@/lib/task-status'
 
 export function TaskForm({
     onTaskCreated,
-    projectId
+    projectId,
+    parentTaskId,
 }: {
     onTaskCreated: () => void
     projectId?: string
+    /**
+     * Si viene, la tarea se crea como subtarea de esta (R5). Cambia el
+     * disparador y el título del diálogo, pero el formulario es el mismo:
+     * una subtarea tiene los mismos campos que una tarea.
+     */
+    parentTaskId?: string
 }) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -107,6 +114,7 @@ export function TaskForm({
                 .from('tasks')
                 .insert([{
                     project_id: formData.project_id || null,
+                    parent_task_id: parentTaskId ?? null,
                     title: formData.title,
                     status: formData.status,
                     deadline: formData.deadline || null,
@@ -202,11 +210,18 @@ export function TaskForm({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button>Nueva Tarea</Button>
+                {parentTaskId ? (
+                    <Button variant="ghost" size="sm" className="h-7 gap-1 px-2 text-xs text-slate-500 hover:text-slate-700">
+                        <Plus className="h-3.5 w-3.5" />
+                        Subtarea
+                    </Button>
+                ) : (
+                    <Button>Nueva Tarea</Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                    <DialogTitle>Crear Nueva Tarea</DialogTitle>
+                    <DialogTitle>{parentTaskId ? 'Nueva subtarea' : 'Crear Nueva Tarea'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
                     {!projectId && (

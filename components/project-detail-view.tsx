@@ -4,27 +4,18 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { Project, Task, TaskAssignee } from '@/types'
+import { Project } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { TaskForm } from '@/components/task-form'
-import { TaskEditForm } from '@/components/task-edit-form'
+import { TaskCard, type TaskWithAssignees } from '@/components/task-card'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskCompletionModal } from '@/components/task-completion-modal'
-import { ArrowLeft, Calendar, CalendarPlus, CheckCircle2, Circle, Clock, PauseCircle, Ban, AlertTriangle, Pencil, Check, X, Trash2 } from 'lucide-react'
+import { ArrowLeft, Calendar, CalendarPlus, CheckCircle2, Pencil, Check, X, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import {
-    TASK_STATUSES,
-    DEFAULT_TASK_STATUS,
-    computeProgress,
-    getStatusColor,
-    getDeadlineState,
-    getDeadlineLabel,
-    getDeadlineColor,
-} from '@/lib/task-status'
+import { computeProgress, getStatusColor } from '@/lib/task-status'
 
 /**
  * Bloque de texto largo con edición en línea.
@@ -102,9 +93,7 @@ function CampoTextoEditable({ etiqueta, valor, editable, placeholder, onGuardar 
     )
 }
 
-type TaskWithAssignees = Task & {
-    assignees: TaskAssignee[]
-}
+
 
 export function ProjectDetailView({ projectId }: { projectId: string }) {
     const router = useRouter()
@@ -175,23 +164,15 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
         fetchProjectData()
     }, [fetchProjectData])
 
+    // R5: la lista se arma por jerarquía. Una tarea sin parent_task_id es de
+    // primer nivel; las demás cuelgan de ella. El avance sigue contando todas
+    // por igual —madres y subtareas— porque cada una es trabajo real.
+    const tareasRaiz = tasks.filter(t => !t.parent_task_id)
+    const subtareasDe = (id: string) => tasks.filter(t => t.parent_task_id === id)
+
     const completedTasks = tasks.filter(t => t.status === 'Terminada').length
     const progress = computeProgress(tasks)
 
-    const getStatusIcon = (status: string | null) => {
-        switch (status) {
-            case 'Terminada':
-                return <CheckCircle2 className="w-5 h-5 text-green-600" />
-            case 'En desarrollo':
-                return <Clock className="w-5 h-5 text-blue-600" />
-            case 'Pausada':
-                return <PauseCircle className="w-5 h-5 text-amber-600" />
-            case 'Cancelada':
-                return <Ban className="w-5 h-5 text-rose-500" />
-            default:
-                return <Circle className="w-5 h-5 text-slate-400" />
-        }
-    }
 
     const updateProjectTitle = async () => {
         if (!editedTitle.trim()) {
@@ -628,114 +609,16 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                     </Card>
                 ) : (
                     <div className="space-y-3">
-                        {tasks.map((task) => (
-                            <Card key={task.id} className="hover:shadow-md transition-shadow">
-                                <CardContent className="p-4">
-                                    <div className="flex items-start gap-4">
-                                        <div className="mt-1">
-                                            {getStatusIcon(task.status)}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-2 mb-2">
-                                                <h3 className="font-semibold text-lg">{task.title}</h3>
-                                                <div className="flex gap-2 items-center w-full md:w-auto">
-                                                    <Select
-                                                        disabled={!!project.completed_at}
-                                                        value={task.status || DEFAULT_TASK_STATUS}
-                                                        onValueChange={async (newStatus) => {
-                                                            if (newStatus === 'Terminada') {
-                                                                setActiveTaskForCompletion(task)
-                                                                return
-                                                            }
-
-                                                            // Optimistic update for non-terminal statuses
-                                                            const previousTasks = [...tasks]
-                                                            setTasks(tasks.map(t =>
-                                                                t.id === task.id ? { ...t, status: newStatus } : t
-                                                            ))
-
-                                                            try {
-                                                                const { error } = await supabase
-                                                                    .from('tasks')
-                                                                    .update({ status: newStatus })
-                                                                    .eq('id', task.id)
-
-                                                                if (error) throw error
-
-                                                                // Refresh to ensure consistency (e.g. completion modal)
-                                                                fetchProjectData()
-                                                            } catch (error) {
-                                                                console.error('Error updating task status:', error)
-                                                                alert('No se pudo actualizar el estado de la tarea')
-                                                                // Revert on error
-                                                                setTasks(previousTasks)
-                                                            }
-                                                        }}
-                                                    >
-                                                        <SelectTrigger className="w-full md:w-[140px]">
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {TASK_STATUSES.map((estado) => (
-                                                                <SelectItem key={estado} value={estado}>{estado}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-
-                                                    {!project.completed_at && (
-                                                        <TaskEditForm
-                                                            task={task}
-                                                            onTaskUpdated={fetchProjectData}
-                                                            onTaskDeleted={fetchProjectData}
-                                                        />
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {task.assignees.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mb-2">
-                                                    {task.assignees.map((assignee) => (
-                                                        <Badge key={assignee.id} variant="outline" className="text-xs">
-                                                            {assignee.assignee_name}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            )}
-
-                                            {task.deadline && (() => {
-                                                const estadoVencimiento = getDeadlineState(task.deadline, task.status)
-                                                return (
-                                                    <div className="flex flex-wrap items-center gap-1.5 text-sm text-slate-600 mb-2">
-                                                        <Calendar className="w-4 h-4" />
-                                                        <span>Vence: {new Date(task.deadline + 'T00:00:00').toLocaleDateString()}</span>
-                                                        {estadoVencimiento && (
-                                                            <Badge variant="outline" className={`gap-1 ${getDeadlineColor(estadoVencimiento)}`}>
-                                                                <AlertTriangle className="w-3 h-3" />
-                                                                {getDeadlineLabel(task.deadline!, estadoVencimiento)}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                )
-                                            })()}
-
-                                            {task.notes && (
-                                                <p className="text-sm text-slate-600 mb-2">{task.notes}</p>
-                                            )}
-
-                                            {task.link && (
-                                                <a
-                                                    href={task.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="text-sm text-blue-600 hover:underline"
-                                                >
-                                                    Ver enlace →
-                                                </a>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                        {tareasRaiz.map((task) => (
+                            <TaskCard
+                                key={task.id}
+                                task={task}
+                                subtasks={subtareasDe(task.id)}
+                                projectId={projectId}
+                                proyectoCerrado={!!project.completed_at}
+                                onPedirCompletar={setActiveTaskForCompletion}
+                                onCambio={fetchProjectData}
+                            />
                         ))}
                     </div>
                 )}
