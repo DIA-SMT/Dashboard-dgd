@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
-import { Project, Task } from '@/types'
+import { Project } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,13 +19,6 @@ import { DailyNotesPanel } from '@/components/daily-notes-panel'
 import { TaskSummary, type TareaConProyecto } from '@/components/task-summary'
 import { countsTowardProgress, avanceEfectivo } from '@/lib/task-status'
 
-type ProjectProgress = {
-    name: string
-    completed: number
-    remaining: number
-    total: number
-}
-
 export function ProjectsListView() {
     const router = useRouter()
     const [projects, setProjects] = useState<Project[]>([])
@@ -39,7 +32,6 @@ export function ProjectsListView() {
     // estado (los indicadores), prioridad y fecha (el ordenamiento).
     const [filtroResponsable, setFiltroResponsable] = useState('__TODOS__')
     const [members, setMembers] = useState<{ id: string; full_name: string }[]>([])
-    const [chartData, setChartData] = useState<ProjectProgress[]>([])
     const [activeCompletionProjectId, setActiveCompletionProjectId] = useState<string | null>(null)
     // Lo que sale de contar tareas. El avance que se MUESTRA es el efectivo,
     // que puede estar pisado por un valor cargado a mano (R11).
@@ -170,77 +162,32 @@ export function ProjectsListView() {
     const fetchTasksAndProgress = useCallback(async () => {
         try {
             setLoadError(null)
-            const { data: allTasks } = await supabase
+            // Los responsables se traen para poder agrupar el gráfico por persona.
+            const { data, error } = await supabase
                 .from('tasks')
-                .select('*, projects(*)')
+                .select('*, projects(*), task_assignees(assignee_name)')
                 .eq('habilita', 1)
 
-            const progressMap = new Map<string, ProjectProgress>()
-            const progressState: Record<string, number> = {}
+            if (error) throw error
 
-            if (allTasks) {
-                // Define a type for the joined query result
-                type TaskWithProject = Task & { projects: Project | null }
+            const tareas = (data ?? []) as unknown as TareaConProyecto[]
 
-                (allTasks as unknown as TaskWithProject[]).forEach((task) => {
-                    const projectId = task.project_id
-                    const projectName = task.projects?.title || 'Sin Proyecto'
-
-                    // Chart Data Calculation
-                    if (!progressMap.has(projectName)) {
-                        progressMap.set(projectName, {
-                            name: projectName,
-                            completed: 0,
-                            remaining: 0,
-                            total: 0
-                        })
-                    }
-
-                    // Las canceladas no cuentan: ni como hechas ni como pendientes.
-                    if (!countsTowardProgress(task.status)) return
-
-                    const stats = progressMap.get(projectName)!
-                    stats.total++
-                    if (task.status === 'Terminada') {
-                        stats.completed++
-                    } else {
-                        stats.remaining++
-                    }
-
-                    // Progress State Calculation (per project ID)
-                    if (projectId) {
-                        if (!progressState[projectId]) {
-                            // Initialize with temporary count to compute percentage later
-                            // We'll store: { total: count, completed: count } temporarily in a Map?
-                            // No, let's better rebuild strictly for IDs.
-                        }
-                    }
-                })
-
-                // Cleaner approach: Calculate per-projectID progress
-                const projectStats: Record<string, { total: number, completed: number }> = {}
-
-                allTasks.forEach((task) => {
-                    if (!task.project_id) return
-                    if (!countsTowardProgress(task.status)) return
-                    if (!projectStats[task.project_id]) {
-                        projectStats[task.project_id] = { total: 0, completed: 0 }
-                    }
-                    projectStats[task.project_id].total++
-                    if (task.status === 'Terminada') {
-                        projectStats[task.project_id].completed++
-                    }
-                })
-
-                Object.keys(projectStats).forEach(projectId => {
-                    const stats = projectStats[projectId]
-                    progressState[projectId] = Math.round((stats.completed / stats.total) * 100)
-                })
+            // Avance por proyecto. Las canceladas quedan fuera del denominador.
+            const acum: Record<string, { total: number; hechas: number }> = {}
+            for (const t of tareas) {
+                if (!t.project_id || !countsTowardProgress(t.status)) continue
+                acum[t.project_id] ??= { total: 0, hechas: 0 }
+                acum[t.project_id].total++
+                if (t.status === 'Terminada') acum[t.project_id].hechas++
             }
 
-            setAllTasks((allTasks ?? []) as unknown as TareaConProyecto[])
-            setChartData(Array.from(progressMap.values()).sort((a, b) => b.total - a.total))
-            setAvanceCalculado(progressState)
+            const avance: Record<string, number> = {}
+            for (const [id, { total, hechas }] of Object.entries(acum)) {
+                avance[id] = Math.round((hechas / total) * 100)
+            }
+
+            setAllTasks(tareas)
+            setAvanceCalculado(avance)
         } catch (error) {
             console.error('Error fetching tasks and progress:', error)
             setLoadError('No se pudieron cargar los datos de progreso.')
@@ -787,7 +734,7 @@ export function ProjectsListView() {
 
             {/* Project Progress Chart */}
             <div className="max-w-7xl mx-auto mt-12 pb-12">
-                <ProjectProgressChart data={chartData} />
+                <ProjectProgressChart tasks={allTasks} />
             </div>
 
             {/* Completion Modal */}

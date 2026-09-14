@@ -266,9 +266,23 @@ export async function POST(req: Request) {
                     }
                 }
 
-                // Filtrar por miembro asignado (vía tabla task_assignees) si existe
+                // Filtrar por miembro asignado.
+                //
+                // Ojo con el atajo `.eq('task_assignees.member_id', x)`: sobre un embed
+                // normal, PostgREST filtra las filas EMBEBIDAS, no las tareas. Devolvía
+                // todas las tareas con el array de responsables vacío, así que el
+                // asistente listaba tareas ajenas como "Sin asignar". Hay que resolver
+                // primero los ids, como ya hacía la rama de "mis tareas".
                 if (member_id) {
-                    query = query.eq('task_assignees.member_id', member_id);
+                    const { data: deEseMiembro, error: errMiembro } = await supabase
+                        .from('task_assignees')
+                        .select('task_id')
+                        .eq('member_id', member_id)
+
+                    if (errMiembro) throw new Error(errMiembro.message)
+                    const ids = (deEseMiembro ?? []).map((r: any) => r.task_id).filter(Boolean)
+                    if (ids.length === 0) return []
+                    query = query.in('id', ids)
                 }
 
                 // "Mis tareas": resolvemos el miembro por email del usuario autenticado y filtramos por member_id
@@ -299,9 +313,17 @@ export async function POST(req: Request) {
                     query = query.in('id', taskIds)
                 }
 
+                // Mismo problema que arriba: el filtro sobre el embed no descarta tareas.
                 if (assignee_name) {
-                    // Filtrar por nombre de asignado (solo join table)
-                    query = query.ilike('task_assignees.assignee_name', `%${assignee_name}%`)
+                    const { data: porNombre, error: errNombre } = await supabase
+                        .from('task_assignees')
+                        .select('task_id')
+                        .ilike('assignee_name', `%${assignee_name}%`)
+
+                    if (errNombre) throw new Error(errNombre.message)
+                    const ids = (porNombre ?? []).map((r: any) => r.task_id).filter(Boolean)
+                    if (ids.length === 0) return []
+                    query = query.in('id', ids)
                 }
 
                 // `due_date` no existe en el esquema actual; ordenamos por created_at.

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageCircle, X, Send, Loader2, Bot, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ChatMarkdown } from '@/components/chat-markdown'
 
 export function ChatWidget() {
     const [isOpen, setIsOpen] = useState(false)
@@ -88,12 +89,19 @@ export function ChatWidget() {
                                     m.role === 'user' ? "justify-end" : "justify-start"
                                 )}>
                                     <div className={cn(
-                                        "max-w-[80%] rounded-2xl px-3 py-2 text-sm whitespace-pre-wrap",
+                                        "max-w-[80%] rounded-2xl px-3 py-2 text-sm",
                                         m.role === 'user'
-                                            ? "bg-blue-600 text-white rounded-tr-none shadow-sm"
+                                            ? "bg-blue-600 text-white rounded-tr-none shadow-sm whitespace-pre-wrap"
                                             : "bg-slate-100 text-slate-900 rounded-tl-none"
                                     )}>
-                                        {hasAnyText(m) ? getMessageText(m) : (m.role === 'assistant' ? '…' : '')}
+                                        {/* Lo del usuario va tal cual; lo del asistente viene en
+                                            Markdown y hay que interpretarlo, si no se ven los
+                                            asteriscos de las negritas. */}
+                                        {m.role === 'user' ? (
+                                            hasAnyText(m) ? getMessageText(m) : ''
+                                        ) : hasAnyText(m) ? (
+                                            <ChatMarkdown texto={getMessageText(m)} />
+                                        ) : '…'}
                                     </div>
                                 </div>
                             ))}
