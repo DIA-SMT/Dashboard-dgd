@@ -102,6 +102,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const { role } = useAuth()
     const [project, setProject] = useState<Project | null>(null)
     const [tasks, setTasks] = useState<TaskWithAssignees[]>([])
+    const [comentariosPorTarea, setComentariosPorTarea] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(true)
     const [showCompletionModal, setShowCompletionModal] = useState(false)
     const [activeTaskForCompletion, setActiveTaskForCompletion] = useState<TaskWithAssignees | null>(null)
@@ -146,6 +147,32 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                 }))
 
                 setTasks(tasksWithAssigneesFormatted)
+
+                // Cuántas observaciones tiene cada tarea, de una sola consulta.
+                // Es lo que permite mostrar el punto en la tarjeta sin abrir el
+                // hilo de a una. PostgREST no expone un count agrupado, así que
+                // se traen los task_id y se cuentan acá; son pocas filas por
+                // proyecto y el índice task_comments_task_id_idx las resuelve.
+                const ids = tasksWithAssigneesFormatted.map((t: TaskWithAssignees) => t.id)
+                if (ids.length > 0) {
+                    const { data: comentarios, error: errorComentarios } = await supabase
+                        .from('task_comments')
+                        .select('task_id')
+                        .eq('habilita', 1)
+                        .in('task_id', ids)
+
+                    if (errorComentarios) {
+                        console.error('Error contando las observaciones:', errorComentarios)
+                    } else {
+                        const cuenta: Record<string, number> = {}
+                        for (const c of comentarios ?? []) {
+                            if (c.task_id) cuenta[c.task_id] = (cuenta[c.task_id] ?? 0) + 1
+                        }
+                        setComentariosPorTarea(cuenta)
+                    }
+                } else {
+                    setComentariosPorTarea({})
+                }
 
                 // Check if all tasks are completed
                 // We no longer auto-show the modal here. The flow is: 
@@ -742,6 +769,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                 proyectoCerrado={!!project.completed_at}
                                 onPedirCompletar={setActiveTaskForCompletion}
                                 onCambio={fetchProjectData}
+                                comentariosPorTarea={comentariosPorTarea}
                             />
                         ))}
                     </div>
@@ -790,15 +818,25 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                         onClose={() => setActiveTaskForCompletion(null)}
                         onConfirm={async (notes) => {
                             try {
-                                const { error } = await supabase
+                                // El .select() detecta el rechazo de RLS, que
+                                // no llega como error sino como cero filas. Sin
+                                // esto la tarea parecía cerrarse y volvía atrás
+                                // al recargar.
+                                const { data, error } = await supabase
                                     .from('tasks')
                                     .update({
                                         status: 'Terminada',
                                         notes: notes || null
                                     })
                                     .eq('id', activeTaskForCompletion.id)
+                                    .select('id')
 
                                 if (error) throw error
+                                if (!data || data.length === 0) {
+                                    alert('No tenés permiso para cerrar esta tarea. Sólo pueden hacerlo sus responsables o un administrador.')
+                                    setActiveTaskForCompletion(null)
+                                    return
+                                }
                                 fetchProjectData()
                             } catch (error) {
                                 console.error('Error finalizando tarea:', error)

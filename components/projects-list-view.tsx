@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Project } from '@/types'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ProjectForm } from '@/components/project-form'
 import { ProjectSummary, type Filtro } from '@/components/project-summary'
@@ -15,7 +14,8 @@ import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskSummary, type TareaConProyecto } from '@/components/task-summary'
 import { ProjectsTable } from '@/components/projects-table'
 import { PanelLateral } from '@/components/panel-lateral'
-import { Search, LayoutGrid, List, AlertCircle, Loader2, MoreVertical, Trash2, Upload, Eye } from 'lucide-react'
+import { EncabezadoProyectos } from '@/components/encabezado-proyectos'
+import { LayoutGrid, List, AlertCircle, Loader2, MoreVertical, Trash2, Upload, Eye } from 'lucide-react'
 import { countsTowardProgress, avanceEfectivo } from '@/lib/task-status'
 import { iniciales, tonoAvatar, fechaCorta, tiempoRelativo } from '@/lib/ui'
 
@@ -237,14 +237,13 @@ export function ProjectsListView() {
 
     return (
         <div className="px-5 py-6 lg:px-7">
-            {/* Encabezado + acción principal */}
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">Proyectos</h1>
-                    <p className="mt-0.5 text-sm text-slate-500">Gestiona y da seguimiento a tus proyectos</p>
-                </div>
-                <ProjectForm onProjectCreated={() => { fetchProjects(); fetchActividad() }} />
-            </div>
+            <EncabezadoProyectos
+                busqueda={searchQuery}
+                onBuscar={setSearchQuery}
+                proyectos={projects}
+                tareas={allTasks}
+                accion={<ProjectForm onProjectCreated={() => { fetchProjects(); fetchActividad() }} />}
+            />
 
             {loadError && (
                 <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
@@ -267,16 +266,6 @@ export function ProjectsListView() {
                 <div className="min-w-0">
                     {/* Buscador y filtros */}
                     <div className="mb-3 flex flex-wrap items-center gap-2">
-                        <div className="relative min-w-[200px] flex-1">
-                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                            <Input
-                                placeholder="Buscar por nombre, área o descripción..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="border-slate-200 bg-white pl-9 dark:bg-slate-900"
-                            />
-                        </div>
-
                         <Select value={filtroResponsable} onValueChange={setFiltroResponsable}>
                             <SelectTrigger className="w-[190px] border-slate-200 bg-white dark:bg-slate-900">
                                 <SelectValue placeholder="Responsable" />

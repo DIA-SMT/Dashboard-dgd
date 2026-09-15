@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { avisarAsignacion } from '@/lib/notificaciones'
 import { Task, TaskAssignee, Member } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -148,39 +149,13 @@ export function TaskEditForm({
 
                 if (assigneeError) throw assigneeError
 
-                // Enviar notificaciones por email a los responsables
-                const emailPromises = selectedMembers
-                    .filter(member => member.email) // Solo enviar a miembros con email
-                    .map(async (member) => {
-                        try {
-                            const response = await fetch('/api/send-task-notification', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    email: member.email,
-                                    memberName: member.full_name,
-                                    taskTitle: formData.title,
-                                    taskNotes: formData.notes || null,
-                                    taskLink: formData.link || null,
-                                    projectTitle: projectTitle,
-                                    notificationType: 'update', // Indicar que es una actualización
-                                }),
-                            })
-
-                            if (!response.ok) {
-                                const errorData = await response.json()
-                                console.error(`Error enviando email a ${member.email}:`, errorData)
-                            }
-                        } catch (error) {
-                            console.error(`Error enviando email a ${member.email}:`, error)
-                        }
-                    })
-
-                // Enviar emails en paralelo (no bloqueamos la UI)
-                Promise.all(emailPromises).catch(err => {
-                    console.error('Error al enviar algunos emails:', err)
+                // El aviso no bloquea: la tarea ya quedó guardada.
+                avisarAsignacion(selectedMembers, {
+                    titulo: formData.title,
+                    notas: formData.notes || null,
+                    link: formData.link || null,
+                    proyecto: projectTitle,
+                    tipo: 'update',
                 })
             }
 

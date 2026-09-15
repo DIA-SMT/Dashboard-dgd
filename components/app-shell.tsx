@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { iniciales, tonoAvatar } from '@/lib/ui'
+import { SidebarOrnamento } from '@/components/sidebar-ornamento'
 
 /**
  * Rutas que se dibujan solas, sin el armazón.
@@ -83,47 +84,66 @@ type PropsBarra = {
     theme: string
     toggleTheme: () => void
     salir: () => void
+    /** Sin esto no se dibuja la fila de plegado (el cajón de celular). */
+    alternarColapso?: () => void
+}
+
+/**
+ * Membrete institucional.
+ *
+ * El nombre va en tres renglones —la dependencia, la dirección y el municipio—
+ * porque es la jerarquía real y porque "Gerencia de Datos" sola no dice de
+ * quién depende. Plegado queda sólo el isotipo.
+ */
+function Membrete({ compacto }: { compacto: boolean }) {
+    const logo = (
+        <Image
+            src="/logoMuni-sm.png"
+            alt="Municipalidad de San Miguel de Tucumán"
+            width={235}
+            height={235}
+            priority
+            className={compacto ? 'h-8 w-8 object-contain' : 'h-9 w-9 shrink-0 object-contain'}
+            unoptimized
+        />
+    )
+
+    if (compacto) {
+        return (
+            <div className="flex justify-center border-b border-slate-200 px-2 py-3.5 dark:border-slate-800"
+                 title="Dirección de Gerencia de Datos">
+                {logo}
+            </div>
+        )
+    }
+
+    return (
+        <div className="flex items-center gap-2.5 border-b border-slate-200 px-4 py-3.5 dark:border-slate-800">
+            {logo}
+            <span className="min-w-0 leading-none">
+                <span className="block text-[9px] font-medium uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">
+                    Dirección de
+                </span>
+                <span className="mt-[3px] block text-[15px] font-semibold leading-tight text-slate-800 dark:text-slate-100">
+                    Gerencia de Datos
+                </span>
+                <span className="mt-[3px] block text-[9px] font-medium uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                    Municipalidad
+                </span>
+            </span>
+        </div>
+    )
 }
 
 function BarraLateral({
     compacto, visibles, esActivo, alNavegar, nombre, role,
-    menuUsuario, setMenuUsuario, theme, toggleTheme, salir,
+    menuUsuario, setMenuUsuario, theme, toggleTheme, salir, alternarColapso,
 }: PropsBarra) {
     return (
         <div className="flex h-full flex-col bg-white dark:bg-slate-900">
-            {/* Membrete. Con el menú desplegado el logo va arriba y el nombre
-                debajo, en dos renglones completos: puesto al lado, "Gerencia
-                de Datos" no entraba y quedaba cortado. */}
-            <div className={`border-b border-slate-200 dark:border-slate-800 ${compacto ? 'px-2 py-3' : 'px-4 py-4'}`}>
-                {compacto ? (
-                    <Image
-                        src="/Logo_SMT_neg_4.png"
-                        alt="Municipalidad de San Miguel de Tucumán"
-                        width={120} height={120}
-                        title="Dirección de Gerencia de Datos"
-                        className="mx-auto h-8 w-auto object-contain"
-                        unoptimized
-                    />
-                ) : (
-                    <>
-                        <Image
-                            src="/Logo_SMT_neg_4.png"
-                            alt="Municipalidad de San Miguel de Tucumán"
-                            width={160} height={160}
-                            className="mb-2 h-9 w-auto object-contain"
-                            unoptimized
-                        />
-                        <p className="text-[10px] uppercase leading-none tracking-wide text-slate-400">
-                            Dirección de
-                        </p>
-                        <p className="mt-0.5 text-sm font-semibold leading-tight text-slate-800 dark:text-slate-100">
-                            Gerencia de Datos
-                        </p>
-                    </>
-                )}
-            </div>
+            <Membrete compacto={compacto} />
 
-            <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2.5">
+            <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
                 {visibles.map(({ etiqueta, href, icono: Icono }) => {
                     const activo = esActivo(href)
                     return (
@@ -133,12 +153,12 @@ function BarraLateral({
                             onClick={() => alNavegar()}
                             aria-current={activo ? 'page' : undefined}
                             title={compacto ? etiqueta : undefined}
-                            className={`flex items-center gap-2.5 rounded-lg py-2 text-sm transition-colors ${
+                            className={`flex items-center gap-3 rounded-xl py-2.5 text-[13.5px] transition-colors ${
                                 compacto ? 'justify-center px-2' : 'px-3'
                             } ${
                                 activo
-                                    ? 'bg-[#0065ff]/10 font-medium text-[#0065ff]'
-                                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                                    ? 'bg-[#0065ff]/10 font-semibold text-[#0065ff]'
+                                    : 'font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                             }`}
                         >
                             <Icono className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />
@@ -148,10 +168,49 @@ function BarraLateral({
                 })}
             </nav>
 
-            <div className="relative border-t border-slate-200 p-2.5 dark:border-slate-800">
+            {/* Fuera del nav a propósito: es el único control que libera alto,
+                y adentro de una lista con scroll era el primero en quedar tapado
+                justo cuando hacía falta usarlo. */}
+            {/* Plegar el menú se ve y se aprieta igual que el resto de las
+                filas, pero vive fuera del nav a propósito: es el único control
+                que libera alto, y adentro de una lista con scroll era el
+                primero en quedar tapado justo cuando hacía falta usarlo.
+                Sólo en el panel fijo — el cajón de celular se cierra con la
+                cruz, plegarlo ahí no significaría nada. */}
+            {alternarColapso && (
+                <div className="shrink-0 px-3">
+                    <button
+                        onClick={alternarColapso}
+                        aria-label={compacto ? 'Desplegar el menú' : 'Contraer el menú'}
+                        title={compacto ? 'Desplegar el menú' : undefined}
+                        className={`flex w-full items-center gap-3 rounded-xl py-2.5 text-[13.5px] font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100 ${
+                            compacto ? 'justify-center px-2' : 'px-3'
+                        }`}
+                    >
+                        {compacto
+                            ? <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />
+                            : <PanelLeftClose className="h-[18px] w-[18px] shrink-0" strokeWidth={1.9} />}
+                        {!compacto && 'Contraer menú'}
+                    </button>
+                </div>
+            )}
+
+            {/* El remate sólo aparece si sobra alto: en una pantalla baja el menú
+                tiene que ganarle a la decoración. El umbral está medido, no
+                estimado: con el dibujo la barra necesita 625px (membrete 72 +
+                ítems 286 + fila de plegado 40 + remate 165 + ficha 62); sin él,
+                460. 640 deja margen y sigue entrando en un portátil de
+                1366x768, que da cerca de 650 de ventana. */}
+            {!compacto && (
+                <div className="hidden shrink-0 [@media(min-height:640px)]:block">
+                    <SidebarOrnamento />
+                </div>
+            )}
+
+            <div className="relative p-3 pt-0">
                 {menuUsuario && (
-                    <div className={`absolute bottom-full mb-1 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800 ${
-                        compacto ? 'left-2 w-44' : 'left-2.5 right-2.5'
+                    <div className={`absolute bottom-full mb-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800 ${
+                        compacto ? 'left-2 w-44' : 'left-3 right-3'
                     }`}>
                         <Link
                             href="/profile"
@@ -182,8 +241,10 @@ function BarraLateral({
                     onClick={() => setMenuUsuario(!menuUsuario)}
                     aria-expanded={menuUsuario}
                     title={compacto ? nombre : undefined}
-                    className={`flex w-full items-center gap-2.5 rounded-lg py-2 text-left transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                        compacto ? 'justify-center px-1' : 'px-2'
+                    className={`flex w-full items-center gap-2.5 rounded-xl py-2 text-left transition-colors ${
+                        compacto
+                            ? 'justify-center px-1 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            : 'border border-slate-200/80 bg-slate-50 px-2 hover:bg-slate-100 dark:border-slate-700/60 dark:bg-slate-800/60 dark:hover:bg-slate-800'
                     }`}
                 >
                     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${tonoAvatar(nombre)}`}>
@@ -192,7 +253,7 @@ function BarraLateral({
                     {!compacto && (
                         <>
                             <span className="flex min-w-0 flex-col leading-tight">
-                                <span className="truncate text-[13px] font-medium text-slate-800 dark:text-slate-100">
+                                <span className="truncate text-[13px] font-semibold text-slate-800 dark:text-slate-100">
                                     {nombre.split('@')[0]}
                                 </span>
                                 <span className="truncate text-[11px] text-slate-400">
@@ -241,23 +302,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const ancho = colapsado ? ANCHO_CERRADO : ANCHO_ABIERTO
 
     return (
-        <div className="min-h-screen bg-[#f6f8fb] dark:bg-slate-950">
+        <div className="min-h-screen bg-[#eef4fc] dark:bg-slate-950">
             <aside
                 className="fixed inset-y-0 left-0 z-40 hidden border-r border-slate-200 transition-[width] duration-200 lg:block dark:border-slate-800"
                 style={{ width: ancho }}
             >
-                <BarraLateral compacto={colapsado} {...propsBarra} />
-
-                {/* El tirador vive sobre el borde, para no robarle lugar al menú
-                    ni desaparecer cuando está colapsado. */}
-                <button
-                    onClick={() => escribirColapso(!colapsado)}
-                    aria-label={colapsado ? 'Expandir el menú' : 'Colapsar el menú'}
-                    title={colapsado ? 'Expandir el menú' : 'Colapsar el menú'}
-                    className="absolute -right-3 top-20 z-10 flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 shadow-sm transition-colors hover:text-[#0065ff] dark:border-slate-700 dark:bg-slate-800"
-                >
-                    {colapsado ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-                </button>
+                <BarraLateral compacto={colapsado} alternarColapso={() => escribirColapso(!colapsado)} {...propsBarra} />
             </aside>
 
             <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-3 lg:hidden dark:border-slate-800 dark:bg-slate-900">

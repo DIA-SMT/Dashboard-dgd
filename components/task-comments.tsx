@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
@@ -39,11 +39,17 @@ function formatearFecha(iso: string | null): string {
  * sólo puede borrar cada uno lo suyo —o un admin cualquiera—, según las
  * políticas de db/02_pedido.sql.
  */
-export function TaskComments({ taskId, onCantidad }: {
+export function TaskComments({ taskId, onCantidad, autoFoco = false }: {
     taskId: string
     onCantidad?: (n: number) => void
+    /** Pone el cursor en el campo al abrir, para poder escribir sin otro clic. */
+    autoFoco?: boolean
 }) {
     const { user, role } = useAuth()
+    // Por referencia: si el padre pasa una función nueva en cada render, tenerla
+    // en las dependencias de `cargar` dispara una recarga infinita.
+    const avisarCantidad = useRef(onCantidad)
+    avisarCantidad.current = onCantidad
     const [comentarios, setComentarios] = useState<Comentario[]>([])
     const [texto, setTexto] = useState('')
     const [cargando, setCargando] = useState(true)
@@ -63,10 +69,10 @@ export function TaskComments({ taskId, onCantidad }: {
             setError('No se pudieron cargar los comentarios')
         } else {
             setComentarios(data ?? [])
-            onCantidad?.(data?.length ?? 0)
+            avisarCantidad.current?.(data?.length ?? 0)
         }
         setCargando(false)
-    }, [taskId, onCantidad])
+    }, [taskId])
 
     useEffect(() => { cargar() }, [cargar])
 
@@ -109,6 +115,31 @@ export function TaskComments({ taskId, onCantidad }: {
         if (err) {
             console.error('Error borrando comentario:', err)
             alert('No se pudo borrar el comentario')
+            return
+        }
+
+        // Un update que la política rechaza no da error: no toca ninguna fila y
+        // devuelve éxito. Acá no sirve encadenar .select() como en el resto de
+        // la aplicación, porque task_comments_select exige habilita = 1 y la
+        // fila recién apagada ya no pasa ese filtro: pedir la fila de vuelta
+        // hace fallar el update entero. Se comprueba releyendo: si el
+        // comentario sigue visible, no se borró.
+        const { data: sigueAhi, error: errorRelectura } = await supabase
+            .from('task_comments')
+            .select('id')
+            .eq('id', id)
+            .eq('habilita', 1)
+
+        // Si la relectura falla no se puede afirmar nada: recargar el hilo dice
+        // la verdad —el comentario está o no está— mejor que un cartel inventado.
+        if (errorRelectura) {
+            console.error('No se pudo confirmar el borrado:', errorRelectura)
+            await cargar()
+            return
+        }
+
+        if (sigueAhi && sigueAhi.length > 0) {
+            alert('No tenés permiso para borrar este comentario. Sólo puede hacerlo quien lo escribió o un administrador.')
             return
         }
         await cargar()
@@ -158,8 +189,9 @@ export function TaskComments({ taskId, onCantidad }: {
                         <Textarea
                             value={texto}
                             onChange={(e) => setTexto(e.target.value)}
-                            placeholder="Escribí un comentario..."
+                            placeholder="Escribí un comentario u observación..."
                             rows={2}
+                            autoFocus={autoFoco}
                             className="bg-white text-sm"
                         />
                         {error && <p className="text-xs text-red-600">{error}</p>}

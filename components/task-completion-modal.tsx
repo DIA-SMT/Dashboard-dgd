@@ -48,15 +48,16 @@ export function TaskCompletionModal({
                         {taskTitle}
                     </p>
                     <p className="text-sm text-slate-500">
-                        ¿Quieres agregar alguna nota o comentario final sobre esta tarea? (Opcional)
+                        Esto reemplaza la nota de la tarea. Las observaciones que hayas dejado
+                        en el hilo de la tarea no se tocan. (Opcional)
                     </p>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="grid gap-4 py-4">
                     <div className="grid gap-2">
-                        <Label htmlFor="notes">Notas / Comentario</Label>
+                        <Label htmlFor="notes">Nota de cierre</Label>
                         <Textarea
                             id="notes"
-                            placeholder="Ej: Archivos subidos, ajustes realizados..."
+                            placeholder="Ej: archivos subidos, ajustes realizados..."
                             value={notes}
                             onChange={(e) => setNotes(e.target.value)}
                             rows={3}

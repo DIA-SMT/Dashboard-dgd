@@ -54,3 +54,8 @@ desktop.ini
 *.log
 build_log.txt
 lint_log.txt
+
+# scripts sueltos de prueba contra la base: suelen leer la service role key
+# de .env.local, así que no tienen que terminar en el repositorio
+tmp_*.mjs
+tmp_*.js

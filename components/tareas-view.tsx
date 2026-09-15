@@ -406,7 +406,9 @@ export function TareasView() {
                     onConfirm={async (notas: string) => {
                         const { data, error: err } = await supabase
                             .from('tasks')
-                            .update({ status: 'Terminada', notes: notas || aCompletar.notes })
+                            // `|| null` y no `|| notas viejas`: el campo viene precargado
+                            // con la nota actual, así que vaciarlo es una decisión, no un olvido.
+                            .update({ status: 'Terminada', notes: notas || null })
                             .eq('id', aCompletar.id)
                             .select('id')
 

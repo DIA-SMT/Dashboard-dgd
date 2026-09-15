@@ -63,18 +63,18 @@ export function TaskSummary({ tasks }: { tasks: TareaConProyecto[] }) {
                                 onClick={() => setAbierto(activo ? null : grupo)}
                                 aria-expanded={activo}
                                 disabled={cantidad === 0}
-                                className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                className={`flex w-full items-center gap-2.5 px-3 py-2.5 text-left transition-colors ${
                                     activo ? 'bg-slate-50 ring-1 ring-inset ring-slate-200' : 'bg-white hover:bg-slate-50/70'
                                 } ${cantidad === 0 ? 'cursor-default opacity-60' : ''}`}
                             >
-                                <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${tono}`}>
-                                    <Icono className="h-[18px] w-[18px]" strokeWidth={1.75} />
+                                <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${tono}`}>
+                                    <Icono className="h-[17px] w-[17px]" strokeWidth={1.75} />
                                 </span>
                                 <span className="min-w-0 flex-1">
-                                    <span className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                    <span className="block text-[10px] font-medium uppercase tracking-wide text-slate-500">
                                         {etiqueta}
                                     </span>
-                                    <span className="block text-xl font-semibold leading-tight text-slate-900 tabular-nums">
+                                    <span className="block text-lg font-semibold leading-tight text-slate-900 tabular-nums">
                                         {cantidad}
                                     </span>
                                 </span>

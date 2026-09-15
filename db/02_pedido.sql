@@ -117,9 +117,14 @@ create index if not exists task_comments_task_id_idx on public.task_comments(tas
 
 alter table public.task_comments enable row level security;
 
+-- Se ve lo vigente; y además, cada uno lo suyo aunque esté dado de baja: sin
+-- eso no se puede esconder un comentario propio, porque PostgREST arma el
+-- UPDATE con RETURNING y PostgreSQL aplica esta política a la fila resultante.
+-- Ver db/06_comentarios.sql.
 drop policy if exists "task_comments_select" on public.task_comments;
 create policy "task_comments_select" on public.task_comments
-  for select to authenticated using (habilita = 1);
+  for select to authenticated
+  using (habilita = 1 or auth.uid() = author_id or public.is_admin());
 
 -- Comenta cualquier autenticado, pero sólo a nombre propio.
 drop policy if exists "task_comments_insert" on public.task_comments;
@@ -127,11 +132,14 @@ create policy "task_comments_insert" on public.task_comments
   for insert to authenticated with check (auth.uid() = author_id);
 
 -- Edita y borra cada uno lo suyo; un admin, cualquiera.
+--
+-- El WITH CHECK repite la condición del USING en vez de quedar en `true`: así
+-- el autor no puede reasignarle el comentario a otra persona.
 drop policy if exists "task_comments_update" on public.task_comments;
 create policy "task_comments_update" on public.task_comments
   for update to authenticated
   using (auth.uid() = author_id or public.is_admin())
-  with check (true);
+  with check (auth.uid() = author_id or public.is_admin());
 
 
 -- =============================================================================

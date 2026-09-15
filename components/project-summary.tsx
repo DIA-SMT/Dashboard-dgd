@@ -37,19 +37,19 @@ function Indicador({ icono: Icono, etiqueta, valor, nuevos, sufijoNuevos, tono, 
         <button
             onClick={onClick}
             aria-pressed={activo}
-            className={`flex items-center gap-3 rounded-xl border bg-white px-4 py-3.5 text-left transition-all dark:bg-slate-900 ${
+            className={`flex items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 text-left transition-all dark:bg-slate-900 ${
                 activo
                     ? 'border-[#0065ff] ring-1 ring-[#0065ff]/20'
                     : 'border-slate-200 hover:border-slate-300 hover:shadow-sm dark:border-slate-800'
             }`}
         >
-            <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${tono}`}>
-                <Icono className="h-5 w-5" strokeWidth={1.8} />
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${tono}`}>
+                <Icono className="h-[17px] w-[17px]" strokeWidth={1.8} />
             </span>
 
             <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{etiqueta}</span>
-                <span className="block text-2xl font-semibold leading-tight text-slate-900 tabular-nums dark:text-slate-50">
+                <span className="block truncate text-[11px] text-slate-500 dark:text-slate-400">{etiqueta}</span>
+                <span className="block text-lg font-semibold leading-tight text-slate-900 tabular-nums dark:text-slate-50">
                     {valor}
                 </span>
             </span>
@@ -109,7 +109,7 @@ export function ProjectSummary({ projects, currentFilter, onFilterChange, projec
     ]
 
     return (
-        <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+        <div className="mb-4 grid grid-cols-2 gap-2.5 md:grid-cols-3 2xl:grid-cols-6">
             {tarjetas.map(t => (
                 <Indicador
                     key={t.filtro}

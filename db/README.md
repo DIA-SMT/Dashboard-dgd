@@ -14,12 +14,18 @@ En el **SQL Editor** del proyecto Supabase, cada archivo completo y de una sola 
 3. **`03_configuracion.sql`** — gestión de usuarios: la marca de contraseña
    provisoria (`profiles.must_change_password`) y el vínculo entre la nómina y
    las cuentas que inician sesión (`members.user_id`). También aditivo.
+4. **`04_permisos.sql`** — deja que cada uno cierre sus propias tareas, no sólo
+   un administrador.
+5. **`05_sacar_notas.sql`** — opcional: da de baja las notas del día, que la
+   aplicación ya no muestra.
+6. **`06_comentarios.sql`** — arregla el borrado de observaciones, que la
+   política de la base rechazaba.
 
 Al final de `01_base.sql` está la consulta para convertirte en admin. Correla
 **después** de registrarte por la app: sin rol `admin` no vas a poder crear
 proyectos ni tareas.
 
-Los tres archivos son idempotentes, así que se pueden volver a correr sin romper nada.
+Todos son idempotentes, así que se pueden volver a correr sin romper nada.
 
 ## `legacy/`
 

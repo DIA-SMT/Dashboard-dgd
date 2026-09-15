@@ -62,6 +62,7 @@ export function TaskCard({
     proyectoCerrado,
     onPedirCompletar,
     onCambio,
+    comentariosPorTarea = {},
     esSubtarea = false,
 }: {
     task: TaskWithAssignees
@@ -70,11 +71,30 @@ export function TaskCard({
     proyectoCerrado: boolean
     onPedirCompletar: (task: TaskWithAssignees) => void
     onCambio: () => void
+    /**
+     * Cuántas observaciones tiene cada tarea, contadas desde el proyecto en una
+     * sola consulta. Si cada tarjeta lo preguntara sola no se sabría que hay
+     * algo escrito hasta abrir el hilo, que es justo lo que había que evitar.
+     * Viaja el mapa entero, no el número, porque la tarjeta también dibuja sus
+     * subtareas.
+     */
+    comentariosPorTarea?: Record<string, number>
     esSubtarea?: boolean
 }) {
     const [estadoOptimista, setEstadoOptimista] = useState<string | null>(null)
     const [verComentarios, setVerComentarios] = useState(false)
     const [cantComentarios, setCantComentarios] = useState<number | null>(null)
+
+    // El del padre vale hasta que el hilo, ya abierto, informe el suyo. Pero si
+    // el proyecto vuelve a contar y le da otro número, ese es más nuevo que el
+    // que dejó el hilo la última vez: se descarta el local y manda el del padre.
+    const delPadre = comentariosPorTarea[task.id] ?? 0
+    const [ultimoDelPadre, setUltimoDelPadre] = useState(delPadre)
+    if (delPadre !== ultimoDelPadre) {
+        setUltimoDelPadre(delPadre)
+        setCantComentarios(null)
+    }
+    const cuantos = cantComentarios ?? delPadre
 
     const estado = estadoOptimista ?? task.status
     const vencimiento = getDeadlineState(task.deadline, estado)
@@ -204,10 +224,26 @@ export function TaskCard({
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => setVerComentarios(!verComentarios)}
-                                    className="h-7 gap-1 px-2 text-xs text-slate-500 hover:text-slate-700"
+                                    aria-expanded={verComentarios}
+                                    title={cuantos > 0
+                                        ? `${cuantos} ${cuantos === 1 ? 'observación' : 'observaciones'} en esta tarea`
+                                        : 'Agregar una observación'}
+                                    className={`relative h-7 gap-1 px-2 text-xs ${
+                                        cuantos > 0
+                                            ? 'font-medium text-[#0065ff] hover:text-[#0065ff] dark:text-blue-400 dark:hover:text-blue-400'
+                                            : 'text-slate-500 hover:text-slate-700'
+                                    }`}
                                 >
-                                    <MessageSquare className="h-3.5 w-3.5" />
-                                    Comentarios{cantComentarios !== null ? ` (${cantComentarios})` : ''}
+                                    <span className="relative">
+                                        <MessageSquare className="h-3.5 w-3.5" />
+                                        {cuantos > 0 && !verComentarios && (
+                                            <span
+                                                aria-hidden="true"
+                                                className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-[#0065ff] ring-2 ring-white dark:ring-slate-900"
+                                            />
+                                        )}
+                                    </span>
+                                    {cuantos > 0 ? `Observaciones (${cuantos})` : 'Agregar observación'}
                                 </Button>
 
                                 {!esSubtarea && !proyectoCerrado && (
@@ -222,7 +258,7 @@ export function TaskCard({
                             </div>
 
                             {verComentarios && (
-                                <TaskComments taskId={task.id} onCantidad={setCantComentarios} />
+                                <TaskComments taskId={task.id} onCantidad={setCantComentarios} autoFoco />
                             )}
                         </div>
                     </div>
@@ -241,6 +277,7 @@ export function TaskCard({
                                 proyectoCerrado={proyectoCerrado}
                                 onPedirCompletar={onPedirCompletar}
                                 onCambio={onCambio}
+                                comentariosPorTarea={comentariosPorTarea}
                                 esSubtarea
                             />
                         </div>
