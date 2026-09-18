@@ -220,6 +220,50 @@ export type Database = {
                     }
                 ]
             }
+            task_files: {
+                Row: {
+                    id: string
+                    task_id: string
+                    ruta: string
+                    nombre: string
+                    tipo: string | null
+                    tamano: number | null
+                    subido_por: string | null
+                    subido_por_nombre: string | null
+                    created_at: string | null
+                }
+                Insert: {
+                    id?: string
+                    task_id: string
+                    ruta: string
+                    nombre: string
+                    tipo?: string | null
+                    tamano?: number | null
+                    subido_por?: string | null
+                    subido_por_nombre?: string | null
+                    created_at?: string | null
+                }
+                Update: {
+                    id?: string
+                    task_id?: string
+                    ruta?: string
+                    nombre?: string
+                    tipo?: string | null
+                    tamano?: number | null
+                    subido_por?: string | null
+                    subido_por_nombre?: string | null
+                    created_at?: string | null
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "task_files_task_id_fkey"
+                        columns: ["task_id"]
+                        isOneToOne: false
+                        referencedRelation: "tasks"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
             task_comments: {
                 Row: {
                     id: string

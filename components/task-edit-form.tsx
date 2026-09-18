@@ -314,7 +314,7 @@ export function TaskEditForm({
                             />
                         </div>
                         <div className="grid gap-2">
-                            <Label htmlFor="link">Link / Archivo</Label>
+                            <Label htmlFor="link">Link</Label>
                             <Input
                                 id="link"
                                 value={formData.link}

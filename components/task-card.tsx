@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TaskEditForm } from '@/components/task-edit-form'
 import { TaskForm } from '@/components/task-form'
 import { TaskComments } from '@/components/task-comments'
+import { TaskFiles } from '@/components/task-files'
+import type { Adjunto } from '@/lib/adjuntos'
 import {
     Calendar, CheckCircle2, Circle, Clock, PauseCircle, Ban,
     AlertTriangle, MessageSquare, CornerDownRight,
@@ -63,6 +65,7 @@ export function TaskCard({
     onPedirCompletar,
     onCambio,
     comentariosPorTarea = {},
+    adjuntosPorTarea = {},
     esSubtarea = false,
 }: {
     task: TaskWithAssignees
@@ -79,6 +82,13 @@ export function TaskCard({
      * subtareas.
      */
     comentariosPorTarea?: Record<string, number>
+    /**
+     * Los archivos de cada tarea, traídos desde el proyecto en una sola
+     * consulta. Mismo criterio que el conteo de observaciones: si cada tarjeta
+     * los pidiera sola, abrir un proyecto con veinte tareas serían veinte
+     * consultas.
+     */
+    adjuntosPorTarea?: Record<string, Adjunto[]>
     esSubtarea?: boolean
 }) {
     const [estadoOptimista, setEstadoOptimista] = useState<string | null>(null)
@@ -219,6 +229,13 @@ export function TaskCard({
                                 </a>
                             )}
 
+                            <TaskFiles
+                                taskId={task.id}
+                                adjuntos={adjuntosPorTarea[task.id] ?? []}
+                                puedeSubir={!proyectoCerrado}
+                                onCambio={onCambio}
+                            />
+
                             <div className="mt-2 flex flex-wrap items-center gap-1">
                                 <Button
                                     variant="ghost"
@@ -278,6 +295,7 @@ export function TaskCard({
                                 onPedirCompletar={onPedirCompletar}
                                 onCambio={onCambio}
                                 comentariosPorTarea={comentariosPorTarea}
+                                adjuntosPorTarea={adjuntosPorTarea}
                                 esSubtarea
                             />
                         </div>

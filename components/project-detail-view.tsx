@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { TaskForm } from '@/components/task-form'
 import { TaskCard, type TaskWithAssignees } from '@/components/task-card'
+import { listarAdjuntos, type Adjunto } from '@/lib/adjuntos'
 import { ActivityLogView } from '@/components/activity-log-view'
 import { ProjectCompletionModal } from '@/components/project-completion-modal'
 import { TaskCompletionModal } from '@/components/task-completion-modal'
@@ -103,6 +104,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
     const [project, setProject] = useState<Project | null>(null)
     const [tasks, setTasks] = useState<TaskWithAssignees[]>([])
     const [comentariosPorTarea, setComentariosPorTarea] = useState<Record<string, number>>({})
+    const [adjuntosPorTarea, setAdjuntosPorTarea] = useState<Record<string, Adjunto[]>>({})
     const [loading, setLoading] = useState(true)
     const [showCompletionModal, setShowCompletionModal] = useState(false)
     const [activeTaskForCompletion, setActiveTaskForCompletion] = useState<TaskWithAssignees | null>(null)
@@ -172,6 +174,18 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                     }
                 } else {
                     setComentariosPorTarea({})
+                }
+
+                // Los adjuntos, también de una sola consulta para todo el proyecto.
+                if (ids.length > 0) {
+                    const archivos = await listarAdjuntos(ids)
+                    const porTarea: Record<string, Adjunto[]> = {}
+                    for (const a of archivos) {
+                        (porTarea[a.task_id] ??= []).push(a)
+                    }
+                    setAdjuntosPorTarea(porTarea)
+                } else {
+                    setAdjuntosPorTarea({})
                 }
 
                 // Check if all tasks are completed
@@ -770,6 +784,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                                 onPedirCompletar={setActiveTaskForCompletion}
                                 onCambio={fetchProjectData}
                                 comentariosPorTarea={comentariosPorTarea}
+                                adjuntosPorTarea={adjuntosPorTarea}
                             />
                         ))}
                     </div>

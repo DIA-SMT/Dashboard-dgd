@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge'
 import { X, Plus } from 'lucide-react'
 import { TASK_STATUSES, DEFAULT_TASK_STATUS, type TaskStatus } from '@/lib/task-status'
 import { avisarAsignacion } from '@/lib/notificaciones'
+import { SelectorArchivosPendientes } from '@/components/task-files'
+import { subirAdjunto } from '@/lib/adjuntos'
 
 export function TaskForm({
     onTaskCreated,
@@ -36,6 +38,7 @@ export function TaskForm({
     const [assigneeInput, setAssigneeInput] = useState('')
     const [availableMembers, setAvailableMembers] = useState<Member[]>([])
     const [showSuggestions, setShowSuggestions] = useState(false)
+    const [archivos, setArchivos] = useState<File[]>([])
     const [formData, setFormData] = useState({
         project_id: projectId || '',
         title: '',
@@ -44,7 +47,7 @@ export function TaskForm({
         notes: '',
         link: ''
     })
-    const { role } = useAuth()
+    const { role, user } = useAuth()
 
 
 
@@ -150,7 +153,26 @@ export function TaskForm({
                 })
             }
 
+            // Los adjuntos van DESPUÉS del insert: recién ahí hay una tarea a la
+            // cual colgarlos. Si alguno falla se avisa, pero la tarea ya quedó
+            // creada y no se deshace por un archivo.
+            if (archivos.length > 0 && taskData && user) {
+                const autor = {
+                    id: user.id,
+                    nombre: (user.user_metadata?.full_name as string | undefined) ?? user.email ?? 'Sin nombre',
+                }
+                const fallas: string[] = []
+                for (const archivo of archivos) {
+                    const r = await subirAdjunto(taskData.id, archivo, autor)
+                    if (!r.ok) fallas.push(r.error)
+                }
+                if (fallas.length > 0) {
+                    alert('La tarea se creó, pero hubo problemas con los adjuntos:\n\n' + fallas.join('\n'))
+                }
+            }
+
             setOpen(false)
+            setArchivos([])
             setFormData({
                 project_id: projectId || '',
                 title: '',
@@ -299,13 +321,23 @@ export function TaskForm({
                         />
                     </div>
                     <div className="grid gap-2">
-                        <Label htmlFor="link">Link / Archivo</Label>
+                        <Label htmlFor="link">Link</Label>
                         <Input
                             id="link"
                             value={formData.link}
                             onChange={(e) => setFormData({ ...formData, link: e.target.value })}
                             placeholder="https://..."
                         />
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>
+                            Archivos adjuntos <span className="font-normal text-slate-400">(opcional)</span>
+                        </Label>
+                        <SelectorArchivosPendientes archivos={archivos} onCambio={setArchivos} />
+                        <p className="text-xs text-slate-500">
+                            Fotos, PDF, Word, Excel o texto. Hasta 10 MB cada uno. Los ve todo el
+                            equipo desde la tarea.
+                        </p>
                     </div>
                     <Button type="submit" disabled={loading}>
                         {loading ? 'Guardando...' : 'Crear Tarea'}
