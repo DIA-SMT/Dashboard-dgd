@@ -316,6 +316,7 @@ export function TaskForm({
                         <Label htmlFor="notes">Notas</Label>
                         <Textarea
                             id="notes"
+                            className="max-h-48"
                             value={formData.notes}
                             onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                         />
