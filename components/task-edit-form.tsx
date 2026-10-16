@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { avisarAsignacion } from '@/lib/notificaciones'
+import { SelectorMiembros } from '@/components/selector-miembros'
 import { Task, TaskAssignee, Member } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,8 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { X, Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { TASK_STATUSES, DEFAULT_TASK_STATUS } from '@/lib/task-status'
 
@@ -32,9 +32,7 @@ export function TaskEditForm({
     const [loading, setLoading] = useState(false)
     const [deleting, setDeleting] = useState(false)
     const [selectedMembers, setSelectedMembers] = useState<Member[]>([])
-    const [assigneeInput, setAssigneeInput] = useState('')
     const [availableMembers, setAvailableMembers] = useState<Member[]>([])
-    const [showSuggestions, setShowSuggestions] = useState(false)
     const [formData, setFormData] = useState({
         title: task.title,
         status: task.status || DEFAULT_TASK_STATUS,
@@ -77,8 +75,6 @@ export function TaskEditForm({
     function addMember(member: Member) {
         if (!selectedMembers.find(m => m.id === member.id)) {
             setSelectedMembers([...selectedMembers, member])
-            setAssigneeInput('')
-            setShowSuggestions(false)
         }
     }
 
@@ -89,12 +85,6 @@ export function TaskEditForm({
         }
         setSelectedMembers(selectedMembers.filter(m => m.id !== memberId))
     }
-
-    const filteredSuggestions = availableMembers.filter(
-        member =>
-            member.full_name.toLowerCase().includes(assigneeInput.toLowerCase()) &&
-            !selectedMembers.find(m => m.id === member.id)
-    )
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault()
@@ -256,54 +246,13 @@ export function TaskEditForm({
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="assignees">Responsables</Label>
-                            <div className="relative">
-                                <div className="flex gap-2">
-                                    <Input
-                                        id="assignees"
-                                        value={assigneeInput}
-                                        onChange={(e) => {
-                                            setAssigneeInput(e.target.value)
-                                            setShowSuggestions(true)
-                                        }}
-                                        onFocus={() => setShowSuggestions(true)}
-                                        placeholder="Buscar miembro..."
-                                    />
-                                </div>
-
-                                {showSuggestions && filteredSuggestions.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md shadow-lg max-h-40 overflow-y-auto">
-                                        {filteredSuggestions.map((member) => (
-                                            <button
-                                                key={member.id}
-                                                type="button"
-                                                className="w-full text-left px-3 py-2 hover:bg-slate-100 text-sm"
-                                                onClick={() => addMember(member)}
-                                            >
-                                                {member.full_name}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                            {selectedMembers.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {selectedMembers.map((member) => (
-                                        <Badge key={member.id} variant="secondary" className="gap-1">
-                                            {member.full_name}
-                                            <button
-                                                type="button"
-                                                className="ml-1 hover:bg-slate-200 rounded-full p-0.5 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-400"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    removeMember(member.id)
-                                                }}
-                                            >
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        </Badge>
-                                    ))}
-                                </div>
-                            )}
+                            <SelectorMiembros
+                                id="assignees"
+                                disponibles={availableMembers}
+                                elegidos={selectedMembers}
+                                onAgregar={addMember}
+                                onQuitar={removeMember}
+                            />
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="notes">Notas</Label>
