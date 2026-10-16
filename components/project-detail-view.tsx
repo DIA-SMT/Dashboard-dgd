@@ -807,6 +807,7 @@ export function ProjectDetailView({ projectId }: { projectId: string }) {
                         <div className="rounded-b-lg border border-t-0 border-slate-200 bg-white px-4 pb-2">
                             <ActivityLogView
                                 projectId={projectId}
+                                proyecto={project.title}
                                 tareas={Object.fromEntries(tasks.map(t => [t.id, t.title]))}
                             />
                         </div>

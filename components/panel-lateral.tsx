@@ -191,7 +191,7 @@ export function PanelLateral({ proyectos, tareas }: {
             </section>
 
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-                <Encabezado titulo="Actividad reciente" />
+                <Encabezado titulo="Actividad reciente" href="/actividad" />
                 {movimientos.length === 0 ? (
                     <p className="px-4 py-6 text-center text-xs text-slate-400">Todavía no hay movimientos.</p>
                 ) : (
